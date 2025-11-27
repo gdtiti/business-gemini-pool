@@ -64,15 +64,5 @@ USER appuser
 # Expose the port (Note: This is for documentation, actual port mapping is done at runtime)
 EXPOSE 8000
 
-# Health check with timeout and error handling
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys, requests, time; \
-               try: \
-                   requests.get('http://localhost:8000/health', timeout=5); \
-                   sys.exit(0); \
-               except Exception as e: \
-                   sys.exit(1)" || \
-    exit 1
-
 # Default command
-CMD ["python", "-u", "app.py"]
+CMD ["python", "-u", "gemini.py"]

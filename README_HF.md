@@ -29,10 +29,10 @@ license: mit
 ```json
 [
   {
-    "team_id": "your-team-id",
-    "secure_c_ses": "your-secure-c-ses",
-    "host_c_oses": "your-host-c-oses",
-    "csesidx": "your-csesidx",
+    "team_id": "88bb1f65-785c-42ad-874d-239467146fa1",
+    "secure_c_ses": "CSE.ARsLs01tg8lj4YwZPjk1sjGlm83l5PtnoOM_1dvu-w5N_SHF-NlYJTd31gr8sHIkUxMQIYHVaVnl_7S3PaOkWjQfz4MtC5DpBl-nq-WT1XAgJC2XBGXVsZxAokfZ4CFaoicaUwadIO-pJhIDdfnlN_e44PBb9gHipEmJWqA79tgZP0jEPZNf6TY4G2rdmnE37TEgUJ5nadAL_3bN8wvsBQc0CPBdZs3yKudzvyCnwXwtEDhtgOyjjuBdGx3lry1DmoKOyG2ivLejS7eWlXCO6FJCKdxfxC8GawJdZKJZiba-3D955dqKdiQgG8F1aeLxrvXPWLkUQJ6QWTnIt2nM2rI1Y39rFzXSE72DJ3dsZU-JOW6kuHjU20JaBFxJvDx7J61_rOOTM9TgdBkFQZ0ucmeqwUwfi47MrtOL7w2HNZq4KcaBifb7o8SHhrVKcsBi-gBqlXhVELNsbOOK",
+    "host_c_oses": "COS.AQH81rjw7HwLkehCe4KN9U4G-9R6rp5Y71v0afgZn5_gp5ZCYG-wnmXogc5MW81kIv5_-oRHog78j8ZIj7wVkOjI7MwJk0h0K1euShl7tZEwFfa_S6gX_05Arh9jYfn4XMFm4bu9H4GvusCf",
+    "csesidx": "1443551910",
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "available": true
   }
