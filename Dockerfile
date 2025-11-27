@@ -37,13 +37,17 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt ./
 
-# Install Python dependencies with robust error handling
+# Install Python dependencies with better error handling
 RUN echo "Starting Python dependencies installation..." && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    echo "pip upgrade successful, installing requirements..." && \
-    pip install --no-cache-dir -r requirements.txt && \
-    echo "Requirements installed successfully, cleaning cache..." && \
-    pip cache purge || echo "Cache purge completed (or failed, continuing)"
+    echo "Python version: $(python --version)" && \
+    echo "Current pip version: $(pip --version)" && \
+    python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    echo "pip upgrade successful" && \
+    echo "Requirements file content:" && \
+    cat requirements.txt && \
+    echo "Installing requirements..." && \
+    python -m pip install --no-cache-dir --verbose -r requirements.txt && \
+    echo "Requirements installed successfully"
 
 # Copy application code
 COPY --chown=appuser:appuser . .
@@ -53,8 +57,6 @@ RUN mkdir -p /app/image /app/logs && \
     chown -R appuser:appuser /app && \
     chmod 755 /app
 
-# Health check dependencies
-RUN pip install --no-cache-dir requests
 
 # Switch to non-root user
 USER appuser

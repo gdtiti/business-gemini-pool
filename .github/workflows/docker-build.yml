@@ -103,6 +103,8 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
+          # Add more verbose output for debugging
+          provenance: false
 
       - name: Debug Docker build
         if: failure()
@@ -116,6 +118,13 @@ jobs:
           echo ""
           echo "Available disk space:"
           df -h
+          echo ""
+          echo "Checking Python environment:"
+          python --version
+          pip --version
+          echo ""
+          echo "Attempting local pip install test:"
+          python -m pip install --no-cache-dir --verbose flask flask-cors requests urllib3 || echo "Local pip install also failed"
 
   security-scan:
     name: Security Scan
