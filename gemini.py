@@ -47,13 +47,59 @@ app = Flask(__name__, static_folder='.')
 CORS(app)
 
 
+def require_api_key(f):
+    """API Key 鉴权装饰器"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 加载配置检查是否需要鉴权
+        config = load_config_from_env()
+
+        if not config.get("require_auth", False):
+            return f(*args, **kwargs)
+
+        # 获取配置的 API key
+        required_api_key = config.get("downstream_api_key", "")
+        if not required_api_key:
+            return jsonify({
+                "error": {
+                    "message": "Server configuration error: API key not configured",
+                    "type": "configuration_error"
+                }
+            }), 500
+
+        # 从请求头获取 API key
+        provided_api_key = request.headers.get('Authorization', '').replace('Bearer ', '').replace('Api-Key ', '')
+
+        if not provided_api_key:
+            return jsonify({
+                "error": {
+                    "message": "Missing API key in Authorization header",
+                    "type": "invalid_request_error"
+                }
+            }), 401
+
+        if provided_api_key != required_api_key:
+            return jsonify({
+                "error": {
+                    "message": "Invalid API key",
+                    "type": "invalid_request_error"
+                }
+            }), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 def load_config_from_env() -> dict:
     """从环境变量加载配置"""
     config = {
         "proxy": os.getenv("PROXY_URL", ""),
         "image_base_url": os.getenv("IMAGE_BASE_URL", ""),
         "accounts": [],
-        "models": []
+        "models": [],
+        "downstream_api_key": os.getenv("DOWNSTREAM_API_KEY", ""),
+        "require_auth": os.getenv("REQUIRE_AUTH", "false").lower() == "true"
     }
 
     # 从JSON格式加载账号配置
@@ -1225,6 +1271,7 @@ def delete_file(file_id):
 
 
 @app.route('/v1/chat/completions', methods=['POST'])
+@require_api_key
 def chat_completions():
     """聊天对话接口（支持图片输入输出）"""
     try:
@@ -1415,10 +1462,15 @@ def build_openai_response_content(chat_response: ChatResponse, host_url: str) ->
                 image_urls.append(image_url)
         
         if image_urls:
-            # 在文本末尾添加图片URL
+            # 在文本末尾添加图片URL，使用markdown格式
             if result_text:
                 result_text += "\n\n"
-            result_text += "\n".join(image_urls)
+
+            # 将图片URL包装为markdown格式
+            for image_url in image_urls:
+                # 提取文件名作为图片描述
+                file_name = image_url.split('/')[-1]
+                result_text += f"![{file_name}]({image_url})\n"
     
     return result_text
 
@@ -1842,6 +1894,13 @@ def print_startup_info():
     print("  GET  /health              - 健康检查")
     print("  GET  /image/<filename>    - 获取缓存图片")
 
+    print(f"\n[鉴权配置]")
+    require_auth = account_manager.config.get("require_auth", False)
+    api_key_status = "已配置" if account_manager.config.get("downstream_api_key") else "未配置"
+    print(f"  API鉴权: {'启用' if require_auth else '禁用'}")
+    if require_auth:
+        print(f"  API Key: {api_key_status}")
+
     print(f"\n[环境变量配置示例]")
     print("  # JSON格式 (推荐)")
     print("  ACCOUNTS_CONFIG='[{\"team_id\":\"...\",\"secure_c_ses\":\"...\",...}]'")
@@ -1850,6 +1909,11 @@ def print_startup_info():
     print("  ACCOUNT1_SECURE_C_SES=your-secure-ses")
     print("  ACCOUNT1_HOST_C_OSES=your-host-oses")
     print("  ACCOUNT1_CSESIDX=your-csesidx")
+    print("  # API鉴权配置")
+    print("  REQUIRE_AUTH=true                    # 启用API鉴权")
+    print("  DOWNSTREAM_API_KEY=your-secret-key    # 设置API密钥")
+    print("  # 使用鉴权时，请求头需要包含:")
+    print("  # Authorization: Bearer your-secret-key")
 
     print("\n" + "="*60)
     print("启动服务...")
