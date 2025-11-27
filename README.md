@@ -20,9 +20,18 @@
 ├── .github/
 │   └── workflows/
 │       └── docker-build.yml       # GitHub Actions CI/CD工作流
+├── hf/                            # HuggingFace Space 专用配置
+│   ├── app.py                     # HF Space 入口文件
+│   ├── Dockerfile                 # HF Space Docker 镜像
+│   ├── requirements.txt           # HF Space 依赖
+│   ├── config/                    # HF 配置文件
+│   │   └── secrets.env.example    # 环境变量配置示例
+│   ├── README.md                  # HF 部署指南
+│   └── README_HF.md               # HF Space 页面配置
 └── docs/
     ├── ci-cd.md                   # CI/CD 详细配置指南
-    └── github-secrets.md          # GitHub Secrets 配置说明
+    ├── github-secrets.md          # GitHub Secrets 配置说明
+    └── deployment-summary.md      # 部署方案总结
 ```
 
 ## 快速请求

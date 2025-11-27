@@ -30,8 +30,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
+          echo "Dependencies installation completed"
 
       - name: Run syntax check
         run: |
@@ -102,6 +103,19 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Debug Docker build
+        if: failure()
+        run: |
+          echo "Docker build failed. Checking for common issues..."
+          echo "Requirements file:"
+          cat requirements.txt
+          echo ""
+          echo "Dockerfile location:"
+          find . -name "Dockerfile*" -type f
+          echo ""
+          echo "Available disk space:"
+          df -h
 
   security-scan:
     name: Security Scan

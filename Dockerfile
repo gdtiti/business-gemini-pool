@@ -25,23 +25,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Create non-root user with consistent UID across platforms
-RUN echo "appuser:x:1000:1000:App User:/app:/usr/sbin/nologin" >> /etc/passwd \
-    && echo "appuser:x:1000:" >> /etc/group \
-    && echo "appuser:!::0:::::" >> /etc/shadow
+RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
 # Copy requirements first for better caching
 COPY requirements.txt ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+# Install Python dependencies with robust error handling
+RUN echo "Starting Python dependencies installation..." && \
+    pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    echo "pip upgrade successful, installing requirements..." && \
     pip install --no-cache-dir -r requirements.txt && \
-    pip cache purge
+    echo "Requirements installed successfully, cleaning cache..." && \
+    pip cache purge || echo "Cache purge completed (or failed, continuing)"
 
 # Copy application code
 COPY --chown=appuser:appuser . .
