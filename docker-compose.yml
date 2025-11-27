@@ -7,13 +7,22 @@ services:
     restart: unless-stopped
     ports:
       - "9012:9012"
-    volumes:
-      - ./business_gemini_session.json:/app/business_gemini_session.json:rw
+    # 移除配置文件挂载，改用环境变量配置
+    # volumes:
+    #   - ./business_gemini_session.json:/app/business_gemini_session.json:rw
     user: "1000:1000"
     environment:
       - PYTHONUNBUFFERED=1
+      # 配置通过环境变量传入
+      # - PROXY_URL=http://your-proxy:port
+      # - ACCOUNTS_CONFIG=[{"team_id":"your-team-id","secure_c_ses":"your-ses","host_c_oses":"your-oses","csesidx":"your-csesidx","user_agent":"Mozilla/5.0...","available":true}]
+      # 或使用单个账号格式:
+      # - ACCOUNT1_TEAM_ID=your-team-id
+      # - ACCOUNT1_SECURE_C_SES=your-secure-ses
+      # - ACCOUNT1_HOST_C_OSES=your-host-oses
+      # - ACCOUNT1_CSESIDX=your-csesidx
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:9012/health', timeout=5)"]
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -13,7 +13,6 @@ import uuid
 import threading
 import os
 import re
-import shutil
 import mimetypes
 import requests
 from pathlib import Path
@@ -28,7 +27,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 配置
-CONFIG_FILE = Path(__file__).parent / "business_gemini_session.json"
+# CONFIG_FILE = Path(__file__).parent / "business_gemini_session.json"  # 已弃用，使用环境变量
 
 # 图片缓存配置
 IMAGE_CACHE_DIR = Path(__file__).parent / "image"
@@ -48,6 +47,86 @@ app = Flask(__name__, static_folder='.')
 CORS(app)
 
 
+def load_config_from_env() -> dict:
+    """从环境变量加载配置"""
+    config = {
+        "proxy": os.getenv("PROXY_URL", ""),
+        "image_base_url": os.getenv("IMAGE_BASE_URL", ""),
+        "accounts": [],
+        "models": []
+    }
+
+    # 从JSON格式加载账号配置
+    accounts_json = os.getenv("ACCOUNTS_CONFIG", "[]")
+    try:
+        if accounts_json and accounts_json.strip():
+            config["accounts"] = json.loads(accounts_json)
+            print(f"[配置] 从ACCOUNTS_CONFIG加载了 {len(config['accounts'])} 个账号")
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"[!] ACCOUNTS_CONFIG JSON解析错误: {e}")
+
+    # 从JSON格式加载模型配置
+    models_json = os.getenv("MODELS_CONFIG", "[]")
+    try:
+        if models_json and models_json.strip():
+            config["models"] = json.loads(models_json)
+            print(f"[配置] 从MODELS_CONFIG加载了 {len(config['models'])} 个模型")
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"[!] MODELS_CONFIG JSON解析错误: {e}")
+
+    # 如果没有JSON配置，尝试单个账号配置
+    if not config["accounts"]:
+        config["accounts"] = load_individual_accounts()
+
+    # 如果没有模型配置，使用默认模型
+    if not config["models"]:
+        config["models"] = get_default_models()
+
+    return config
+
+
+def load_individual_accounts() -> list:
+    """加载单个账号环境变量配置"""
+    accounts = []
+    account_index = 1
+
+    while True:
+        team_id = os.getenv(f"ACCOUNT{account_index}_TEAM_ID")
+        if not team_id:
+            break
+
+        account = {
+            "team_id": team_id,
+            "secure_c_ses": os.getenv(f"ACCOUNT{account_index}_SECURE_C_SES", ""),
+            "host_c_oses": os.getenv(f"ACCOUNT{account_index}_HOST_C_OSES", ""),
+            "csesidx": os.getenv(f"ACCOUNT{account_index}_CSESIDX", ""),
+            "user_agent": os.getenv(f"ACCOUNT{account_index}_USER_AGENT", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"),
+            "available": True
+        }
+        accounts.append(account)
+        print(f"[配置] 加载账号{account_index}: team_id={team_id}")
+        account_index += 1
+
+    if accounts:
+        print(f"[配置] 从单个环境变量加载了 {len(accounts)} 个账号")
+
+    return accounts
+
+
+def get_default_models() -> list:
+    """获取默认模型配置"""
+    return [
+        {
+            "id": "gemini-enterprise",
+            "name": "Gemini Enterprise",
+            "description": "Google Gemini Enterprise 模型",
+            "context_length": 32768,
+            "max_tokens": 8192,
+            "enabled": True
+        }
+    ]
+
+
 class AccountManager:
     """多账号管理器，支持轮训策略"""
     
@@ -59,27 +138,27 @@ class AccountManager:
         self.lock = threading.Lock()
     
     def load_config(self):
-        """加载配置"""
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                self.config = json.load(f)
-                self.accounts = self.config.get("accounts", [])
-                # 初始化账号状态
-                for i, acc in enumerate(self.accounts):
-                    available = acc.get("available", True)  # 默认可用
-                    self.account_states[i] = {
-                        "jwt": None,
-                        "jwt_time": 0,
-                        "session": None,
-                        "available": available
-                    }
+        """从环境变量加载配置"""
+        self.config = load_config_from_env()
+        self.accounts = self.config.get("accounts", [])
+
+        # 初始化账号状态
+        for i, acc in enumerate(self.accounts):
+            available = acc.get("available", True)  # 默认可用
+            self.account_states[i] = {
+                "jwt": None,
+                "jwt_time": 0,
+                "session": None,
+                "available": available
+            }
+
+        print(f"[配置] 成功加载 {len(self.accounts)} 个账号配置")
         return self.config
     
     def save_config(self):
-        """保存配置到文件"""
-        if self.config and CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(self.config, f, indent=4, ensure_ascii=False)
+        """配置已通过环境变量加载，无需保存到文件"""
+        # 配置现在通过环境变量管理，不再需要保存到文件
+        pass
     
     def mark_account_unavailable(self, index: int, reason: str = ""):
         """标记账号不可用"""
@@ -89,7 +168,7 @@ class AccountManager:
                 self.accounts[index]["unavailable_reason"] = reason
                 self.accounts[index]["unavailable_time"] = datetime.now().isoformat()
                 self.account_states[index]["available"] = False
-                self.save_config()
+                # 移除save_config()调用，配置通过环境变量管理
                 print(f"[!] 账号 {index} 已标记为不可用: {reason}")
     
     def get_available_accounts(self):
@@ -1453,8 +1532,9 @@ def add_account():
         "available": True
     }
     account_manager.config["accounts"] = account_manager.accounts
-    account_manager.save_config()
-    
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
+
     return jsonify({"success": True, "id": idx})
 
 
@@ -1480,7 +1560,8 @@ def update_account(account_id):
     
     # 同步更新config中的accounts
     account_manager.config["accounts"] = account_manager.accounts
-    account_manager.save_config()
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
     return jsonify({"success": True})
 
 
@@ -1500,8 +1581,9 @@ def delete_account(account_id):
             new_states[i] = account_manager.account_states.get(i + 1, {})
     account_manager.account_states = new_states
     account_manager.config["accounts"] = account_manager.accounts
-    account_manager.save_config()
-    
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
+
     return jsonify({"success": True})
 
 
@@ -1520,8 +1602,9 @@ def toggle_account(account_id):
         # 重新启用时清除错误信息
         account_manager.accounts[account_id].pop("unavailable_reason", None)
         account_manager.accounts[account_id].pop("unavailable_time", None)
-    
-    account_manager.save_config()
+
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
     return jsonify({"success": True, "available": not current})
 
 
@@ -1565,8 +1648,9 @@ def add_model():
         account_manager.config["models"] = []
     
     account_manager.config["models"].append(new_model)
-    account_manager.save_config()
-    
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
+
     return jsonify({"success": True})
 
 
@@ -1587,7 +1671,8 @@ def update_model(model_id):
                 model["max_tokens"] = data["max_tokens"]
             if "enabled" in data:
                 model["enabled"] = data["enabled"]
-            account_manager.save_config()
+            # 移除save_config()调用，配置通过环境变量管理
+            # account_manager.save_config()
             return jsonify({"success": True})
     
     return jsonify({"error": "模型不存在"}), 404
@@ -1600,7 +1685,8 @@ def delete_model(model_id):
     for i, model in enumerate(models):
         if model.get("id") == model_id:
             models.pop(i)
-            account_manager.save_config()
+            # 移除save_config()调用，配置通过环境变量管理
+            # account_manager.save_config()
             return jsonify({"success": True})
     
     return jsonify({"error": "模型不存在"}), 404
@@ -1618,7 +1704,8 @@ def update_config():
     data = request.json
     if "proxy" in data:
         account_manager.config["proxy"] = data["proxy"]
-    account_manager.save_config()
+    # 移除save_config()调用，配置通过环境变量管理
+    # account_manager.save_config()
     return jsonify({"success": True})
 
 
@@ -1639,7 +1726,8 @@ def import_config():
                 "session": None,
                 "available": available
             }
-        account_manager.save_config()
+        # 移除save_config()调用，配置通过环境变量管理
+        # account_manager.save_config()
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -1687,59 +1775,82 @@ def print_startup_info():
     print("="*60)
     print("Business Gemini OpenAPI 服务 (多账号轮训版)")
     print("支持图片输入输出 (OpenAI格式)")
+    print("配置方式: 环境变量")
     print("="*60)
-    
-    # 检测配置文件是否存在，不存在则从 .example 复制初始化
-    example_file = Path(__file__).parent / "business_gemini_session.json.example"
-    if not CONFIG_FILE.exists():
-        if example_file.exists():
-            shutil.copy(example_file, CONFIG_FILE)
-            print(f"\n[初始化] 配置文件不存在，已从 {example_file.name} 复制创建")
-        else:
-            print(f"\n[警告] 配置文件和示例文件都不存在，请创建 {CONFIG_FILE.name}")
-    
+
+    print(f"\n[配置方式]")
+    print("  类型: 环境变量配置")
+    print("  支持格式: JSON格式 (ACCOUNTS_CONFIG) 或 单个账号 (ACCOUNT1_*, ACCOUNT2_*...)")
+
     # 加载配置
     account_manager.load_config()
-    
+
     # 代理信息
     proxy = account_manager.config.get("proxy")
     print(f"\n[代理配置]")
     print(f"  地址: {proxy or '未配置'}")
     if proxy:
-        proxy_available = check_proxy(proxy)
-        print(f"  状态: {'✓ 可用' if proxy_available else '✗ 不可用'}")
-    
+        try:
+            proxy_available = check_proxy(proxy)
+            print(f"  状态: {'✓ 可用' if proxy_available else '✗ 不可用'}")
+        except:
+            print(f"  状态: ✗ 连接测试失败")
+
+    # 图片基础URL配置
+    image_base_url = account_manager.config.get("image_base_url")
+    print(f"\n[图片服务配置]")
+    print(f"  基础URL: {image_base_url or '使用请求Host'}")
+
     # 图片缓存信息
     print(f"\n[图片缓存]")
     print(f"  目录: {IMAGE_CACHE_DIR}")
     print(f"  缓存时间: {IMAGE_CACHE_HOURS} 小时")
-    
+
     # 账号信息
     total, available = account_manager.get_account_count()
     print(f"\n[账号配置]")
     print(f"  总数量: {total}")
     print(f"  可用数量: {available}")
-    
-    for i, acc in enumerate(account_manager.accounts):
-        status = "✓" if account_manager.account_states.get(i, {}).get("available", True) else "✗"
-        team_id = acc.get("team_id", "未知") + "..."
-        print(f"  [{i}] {status} team_id: {team_id}")
-    
+
+    if total > 0:
+        for i, acc in enumerate(account_manager.accounts):
+            status = "✓" if account_manager.account_states.get(i, {}).get("available", True) else "✗"
+            team_id = acc.get("team_id", "未知")
+            # 只显示前8个字符以保护隐私
+            team_id_display = team_id[:8] + "..." if len(team_id) > 8 else team_id
+            csesidx = acc.get("csesidx", "")
+            csesidx_display = csesidx[:8] + "..." if len(csesidx) > 8 else csesidx
+            print(f"  [{i}] {status} team_id: {team_id_display}, csesidx: {csesidx_display}")
+    else:
+        print("  [!] 警告: 未配置任何账号")
+        print("  请设置环境变量 ACCOUNTS_CONFIG 或 ACCOUNT1_TEAM_ID 等")
+
     # 模型信息
     models = account_manager.config.get("models", [])
     print(f"\n[模型配置]")
     if models:
         for model in models:
-            print(f"  - {model.get('id')}: {model.get('name', '')}")
+            enabled = "✓" if model.get("enabled", True) else "✗"
+            print(f"  {enabled} {model.get('id')}: {model.get('name', '')}")
     else:
         print("  - gemini-enterprise (默认)")
-    
+
     print(f"\n[接口列表]")
     print("  GET  /v1/models           - 获取模型列表")
     print("  POST /v1/chat/completions - 聊天对话 (支持图片)")
     print("  GET  /v1/status           - 系统状态")
     print("  GET  /health              - 健康检查")
     print("  GET  /image/<filename>    - 获取缓存图片")
+
+    print(f"\n[环境变量配置示例]")
+    print("  # JSON格式 (推荐)")
+    print("  ACCOUNTS_CONFIG='[{\"team_id\":\"...\",\"secure_c_ses\":\"...\",...}]'")
+    print("  # 或单个账号格式")
+    print("  ACCOUNT1_TEAM_ID=your-team-id")
+    print("  ACCOUNT1_SECURE_C_SES=your-secure-ses")
+    print("  ACCOUNT1_HOST_C_OSES=your-host-oses")
+    print("  ACCOUNT1_CSESIDX=your-csesidx")
+
     print("\n" + "="*60)
     print("启动服务...")
 

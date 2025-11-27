@@ -4,12 +4,25 @@
 
 ## 项目结构
 
-```
+```text
 /
 ├── gemini.py                      # 后端服务主程序
+├── app.py                         # HuggingFace Space入口文件
 ├── index.html                     # Web 管理控制台前端
-├── business_gemini_session.json   # 配置文件
-└── README.md                      # 项目文档
+├── chat_history.html              # 聊天记录页面
+├── .env.example                   # 环境变量配置示例
+├── docker-compose.yml             # Docker Compose配置
+├── Dockerfile                     # Docker镜像构建
+├── .dockerignore                  # Docker构建忽略文件
+├── requirements.txt               # Python依赖
+├── README.md                      # 项目文档
+├── README_HF.md                   # HuggingFace Space部署文档
+├── .github/
+│   └── workflows/
+│       └── docker-build.yml       # GitHub Actions CI/CD工作流
+└── docs/
+    ├── ci-cd.md                   # CI/CD 详细配置指南
+    └── github-secrets.md          # GitHub Secrets 配置说明
 ```
 
 ## 快速请求
@@ -105,54 +118,74 @@ curl --location --request POST 'http://127.0.0.1:8000/v1/chat/completions' \
 | POST | `/api/proxy/test` | 测试代理 |
 | GET | `/api/proxy/status` | 获取代理状态 |
 
-### business_gemini_session.json
+### 环境变量配置
 
-配置文件，JSON 格式，包含以下字段：
+项目现在完全依赖环境变量进行配置，不再使用配置文件。支持两种配置方式：
 
-```json
-{
-    "proxy": "http://127.0.0.1:7890",
-    "accounts": [
-        {
-            "team_id": "团队ID",
-            "secure_c_ses": "安全会话Cookie",
-            "host_c_oses": "主机Cookie",
-            "csesidx": "会话索引",
-            "user_agent": "浏览器UA",
-            "available": true
-        }
-    ],
-    "models": [
-        {
-            "id": "模型ID",
-            "name": "模型名称",
-            "description": "模型描述",
-            "context_length": 32768,
-            "max_tokens": 8192,
-            "price_per_1k_tokens": 0.0015
-        }
-    ]
-}
+#### 方式1：JSON格式配置（推荐）
+
+```bash
+# 代理配置（可选）
+PROXY_URL=http://127.0.0.1:7890
+
+# 图片基础URL（可选）
+IMAGE_BASE_URL=http://localhost:8000/
+
+# 账号配置（JSON数组）
+ACCOUNTS_CONFIG=[
+  {
+    "team_id": "your-team-id-1",
+    "secure_c_ses": "your-secure-c-ses-1",
+    "host_c_oses": "your-host-c-oses-1",
+    "csesidx": "your-csesidx-1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "available": true
+  }
+]
+
+# 模型配置（可选，JSON数组）
+MODELS_CONFIG=[
+  {
+    "id": "gemini-enterprise",
+    "name": "Gemini Enterprise",
+    "description": "Google Gemini Enterprise 模型",
+    "context_length": 32768,
+    "max_tokens": 8192,
+    "enabled": true
+  }
+]
+```
+
+#### 方式2：单个账号配置
+
+```bash
+# 代理配置（可选）
+PROXY_URL=http://127.0.0.1:7890
+
+# 账号1配置
+ACCOUNT1_TEAM_ID=your-team-id-1
+ACCOUNT1_SECURE_C_SES=your-secure-c-ses-1
+ACCOUNT1_HOST_C_OSES=your-host-c-oses-1
+ACCOUNT1_CSESIDX=your-csesidx-1
+ACCOUNT1_USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+
+# 账号2配置（继续添加ACCOUNT2_*等）
+ACCOUNT2_TEAM_ID=your-team-id-2
 ```
 
 #### 配置字段说明
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `proxy` | string | HTTP 代理地址 |
-| `accounts` | array | 账号列表 |
-| `accounts[].team_id` | string | Google Cloud 团队 ID |
-| `accounts[].secure_c_ses` | string | 安全会话 Cookie |
-| `accounts[].host_c_oses` | string | 主机 Cookie |
-| `accounts[].csesidx` | string | 会话索引 |
-| `accounts[].user_agent` | string | 浏览器 User-Agent |
-| `accounts[].available` | boolean | 账号是否可用 |
-| `models` | array | 模型配置列表 |
-| `models[].id` | string | 模型唯一标识 |
-| `models[].name` | string | 模型显示名称 |
-| `models[].description` | string | 模型描述 |
-| `models[].context_length` | number | 上下文长度限制 |
-| `models[].max_tokens` | number | 最大输出 Token 数 |
+| 环境变量 | 类型 | 说明 |
+|----------|------|------|
+| `PROXY_URL` | string | HTTP 代理地址 |
+| `IMAGE_BASE_URL` | string | 图片服务基础URL |
+| `ACCOUNTS_CONFIG` | JSON | 账号配置JSON数组 |
+| `MODELS_CONFIG` | JSON | 模型配置JSON数组 |
+| `ACCOUNT{N}_TEAM_ID` | string | 第N个账号的团队ID |
+| `ACCOUNT{N}_SECURE_C_SES` | string | 第N个账号的安全会话Cookie |
+| `ACCOUNT{N}_HOST_C_OSES` | string | 第N个账号的主机Cookie |
+| `ACCOUNT{N}_CSESIDX` | string | 第N个账号的会话索引 |
+| `ACCOUNT{N}_USER_AGENT` | string | 第N个账号的浏览器UA |
 
 ### index.html
 
@@ -177,40 +210,76 @@ Web 管理控制台前端，单文件 HTML 应用。
 ### 环境要求
 
 - Python 3.7+
-- Flask
-- requests
+- Docker（可选）
 
 ### 安装依赖
 
 ```bash
-pip install flask requests
+pip install -r requirements.txt
 ```
 
-### 配置账号
+### 配置环境变量
 
-编辑 `business_gemini_session.json` 文件，添加你的 Gemini 账号信息：
+复制环境变量示例文件：
 
-```json
-{
-    "proxy": "http://your-proxy:port",
-    "accounts": [
-        {
-            "team_id": "your-team-id",
-            "secure_c_ses": "your-secure-c-ses",
-            "host_c_oses": "your-host-c-oses",
-            "csesidx": "your-csesidx",
-            "user_agent": "Mozilla/5.0 ...",
-            "available": true
-        }
-    ],
-    "models": []
-}
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，添加��的 Gemini 账号信息：
+
+```bash
+# 方式1：JSON格式配置（推荐）
+# 账号配置（必需）
+ACCOUNTS_CONFIG=[
+  {
+    "team_id": "your-team-id",
+    "secure_c_ses": "your-secure-c-ses",
+    "host_c_oses": "your-host-c-oses",
+    "csesidx": "your-csesidx",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "available": true
+  }
+]
+
+# 模型配置（可选，默认有一个模型）
+MODELS_CONFIG=[
+  {
+    "id": "gemini-enterprise",
+    "name": "Gemini Enterprise",
+    "description": "Google Gemini Enterprise 模型",
+    "context_length": 32768,
+    "max_tokens": 8192,
+    "enabled": true
+  }
+]
+
+# 其他可选配置
+PROXY_URL=http://your-proxy:port
+IMAGE_BASE_URL=http://localhost:8000/
 ```
 
 ### 启动服务
 
+#### 方式1：直接运行
+
 ```bash
+# 从 .env 文件加载环境变量
+source .env
 python gemini.py
+```
+
+#### 方式2：使用 Docker
+
+```bash
+# 使用 docker-compose
+docker-compose up -d
+
+# 或者直接使用 Docker
+docker build -t business-gemini-pool .
+docker run -d --name gemini-pool -p 9012:8000 \
+  -e ACCOUNTS_CONFIG='[{"team_id":"your-team-id","secure_c_ses":"your-secure-ses","host_c_oses":"your-oses","csesidx":"your-csesidx","available":true}]' \
+  business-gemini-pool
 ```
 
 服务将在 `http://127.0.0.1:8000` 启动。
@@ -218,6 +287,63 @@ python gemini.py
 ### 访问管理控制台
 
 打开浏览器访问 `http://127.0.0.1:8000/` 即可进入 Web 管理控制台。
+
+### HuggingFace Space 部署
+
+1. Fork 此项目到你的 HuggingFace 账户
+2. 在 Space 的 Settings > Variables and secrets 中配置环境变量：
+   - `ACCOUNTS_CONFIG`: 账号JSON配置（必需）
+   - `PROXY_URL`: 代理地址（可选）
+   - `IMAGE_BASE_URL`: 图片基础URL（可选）
+3. 启动 Space
+
+### GitHub Container Registry 部署
+
+项目已配置自动化的 CI/CD 流水线，代码推送到 GitHub 后会自动：
+
+1. **自动化测试**: Python 语法检查、功能验证
+2. **多平台构建**: 支持 linux/amd64 和 linux/arm64 架构
+3. **安全扫描**: 使用 Trivy 进行漏洞扫描
+4. **自动推送**: 推送到 GitHub Container Registry
+
+#### 获取镜像
+
+```bash
+# 拉取最新版本
+docker pull ghcr.io/your-username/business-gemini-pool:latest
+
+# 拉取特定版本
+docker pull ghcr.io/your-username/business-gemini-pool:v1.0.0
+
+# 拉取开发版本
+docker pull ghcr.io/your-username/business-gemini-pool:develop
+```
+
+#### 部署示例
+
+```bash
+# 生产环境部署
+docker run -d \
+  --name business-gemini-pool \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  -e ACCOUNTS_CONFIG='[{"team_id":"your-team-id","secure_c_ses":"your-ses","host_c_oses":"your-oses","csesidx":"your-csesidx","available":true}]' \
+  -e PROXY_URL=http://your-proxy:port \
+  ghcr.io/your-username/business-gemini-pool:latest
+
+# 开发环境部署
+docker run -d \
+  --name gemini-dev \
+  -p 8000:8000 \
+  -e ACCOUNTS_CONFIG='[{"team_id":"dev-team","secure_c_ses":"dev-ses","host_c_oses":"dev-oses","csesidx":"dev-csesidx","available":true}]' \
+  ghcr.io/your-username/business-gemini-pool:develop
+```
+
+#### CI/CD 状态
+
+[![CI/CD Status](https://github.com/your-username/business-gemini-pool/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/your-username/business-gemini-pool/actions)
+
+详细的 CI/CD 配置请参考 [CI/CD 指南](docs/ci-cd.md)。
 
 ## API 使用示例
 
@@ -332,10 +458,33 @@ curl -X POST http://127.0.0.1:8000/v1/chat/completions \
 
 ## 注意事项
 
-1. **安全性**: 配置文件中包含敏感信息，请妥善保管，不要提交到公开仓库
+1. **安全性**: 环境变量中包含敏感信息，请妥善保管：
+   - 不要将包含敏感信息的 `.env` 文件提交到公开仓库
+   - 在生产环境中使用安全的密钥管理服务
+   - HuggingFace Space 应使用 Variables and secrets 功能
 2. **代理**: 如果需要访问 Google 服务，可能需要配置代理
 3. **账号限制**: 请遵守 Google 的使用条款，合理使用 API
 4. **JWT 有效期**: JWT Token 有效期有限，系统会自动刷新
+5. **配置持久化**: 配置更改只在运行时有效，重启后会重新从环境变量加载
+
+## 配置迁移
+
+如果你有旧版本的 `business_gemini_session.json` 配置文件，可以按以下方式迁移：
+
+```bash
+# 1. 提取配置文件中的账号信息
+jq '.accounts[]' business_gemini_session.json
+
+# 2. 将账号信息转换为环境变量格式
+# 例如设置单个账号：
+export ACCOUNT1_TEAM_ID="your-team-id"
+export ACCOUNT1_SECURE_C_SES="your-secure-c-ses"
+export ACCOUNT1_HOST_C_OSES="your-host-c-oses"
+export ACCOUNT1_CSESIDX="your-csesidx"
+
+# 3. 或者转换为JSON格式：
+export ACCOUNTS_CONFIG='[{"team_id":"your-team-id","secure_c_ses":"your-secure-ses","host_c_oses":"your-oses","csesidx":"your-csesidx","available":true}]'
+```
 
 ## 许可证
 
