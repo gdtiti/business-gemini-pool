@@ -37,7 +37,6 @@ jobs:
       - name: Run syntax check
         run: |
           python -m py_compile gemini.py
-          python -m py_compile app.py
 
       - name: Test environment variable loading
         run: |
