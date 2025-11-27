@@ -11,7 +11,7 @@ ARG TARGETARCH
 LABEL maintainer="Business Gemini Pool"
 LABEL description="Business Gemini Pool - Google Gemini Enterprise API Proxy Service"
 LABEL version="latest"
-LABEL org.opencontainers.image.source="https://github.com/your-org/business-gemini-pool"
+LABEL org.opencontainers.image.source="https://github.com/gdtiti/business-gemini-pool"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Environment variables
@@ -62,7 +62,7 @@ RUN mkdir -p /app/image /app/logs && \
 USER appuser
 
 # Expose the port (Note: This is for documentation, actual port mapping is done at runtime)
-EXPOSE 8000
+EXPOSE 7860
 
 # Default command
 CMD ["python", "-u", "gemini.py"]
