@@ -1515,7 +1515,7 @@
             statusEl.style.color = 'var(--text-muted)';
 
             try {
-                const response = await apiRequest(${API_BASE}/v1/models`, {
+                const response = await apiRequest(`${API_BASE}/v1/models`, {
                     headers: {
                         'Authorization': `Bearer ${testKey}`,
                         'Content-Type': 'application/json'
@@ -1721,7 +1721,7 @@
             if (userAgent) account.user_agent = userAgent;
             
             try {
-                const res = await apiRequest(${API_BASE}/api/accounts/${id}`, {
+                const res = await apiRequest(`${API_BASE}/api/accounts/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(account)
@@ -1748,7 +1748,7 @@
             const userAgent = document.getElementById('newUserAgent').value;
 
             try {
-                const res = await apiRequest(${API_BASE}/api/accounts`, {
+                const res = await apiRequest(`${API_BASE}/api/accounts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -1770,7 +1770,7 @@
         async function deleteAccount(id) {
             if (!confirm('确定要删除这个账号吗？')) return;
             try {
-                const res = await apiRequest(${API_BASE}/api/accounts/${id}`, { method: 'DELETE' });
+                const res = await apiRequest(`${API_BASE}/api/accounts/${id}`, { method: 'DELETE' });
                 if (!res.ok) throw new Error((await res.json()).detail);
                 showToast('账号删除成功!', 'success');
                 loadAccounts();
@@ -1782,7 +1782,7 @@
         async function testAccount(id) {
             showToast(`正在测试账号ID: ${id}...`, 'info');
             try {
-                const res = await apiRequest(${API_BASE}/api/accounts/${id}/test`);
+                const res = await apiRequest(`${API_BASE}/api/accounts/${id}/test`);
                 const data = await res.json();
                 if (res.ok && data.success) {
                     showToast(`账号 ${id} 测试成功!`, 'success');
@@ -1799,7 +1799,7 @@
             const acc = accountsData.find(a => a.id === id);
             const action = acc && acc.enabled !== false ? '停用' : '启用';
             try {
-                const res = await apiRequest(${API_BASE}/api/accounts/${id}/toggle`, {
+                const res = await apiRequest(`${API_BASE}/api/accounts/${id}/toggle`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -1818,7 +1818,7 @@
         // --- 模型管理 (Models) ---
         async function loadModels() {
             try {
-                const res = await apiRequest(${API_BASE}/api/models`);
+                const res = await apiRequest(`${API_BASE}/api/models`);
                 const data = await res.json();
                 modelsData = data.models || [];
                 renderModels();
@@ -1884,7 +1884,7 @@
             };
             
             try {
-                const res = await apiRequest(${API_BASE}/api/models/${id}`, {
+                const res = await apiRequest(`${API_BASE}/api/models/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(model)
@@ -1908,7 +1908,7 @@
         // --- 系统设置 (Settings) ---
         async function loadConfig() {
             try {
-                const res = await apiRequest(${API_BASE}/api/config`);
+                const res = await apiRequest(`${API_BASE}/api/config`);
                 configData = await res.json();
                 document.getElementById('proxyUrl').value = configData.proxy || '';
                 document.getElementById('configJson').value = JSON.stringify(configData, null, 2);
@@ -1933,7 +1933,7 @@
             }
 
             try {
-                const res = await apiRequest(${API_BASE}/api/config`, {
+                const res = await apiRequest(`${API_BASE}/api/config`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ proxy: proxyUrl })
@@ -1952,7 +1952,7 @@
             proxyStatus.textContent = '测试中...';
             proxyStatus.style.color = 'var(--text-muted)';
             try {
-                const res = await apiRequest(${API_BASE}/api/proxy/test`, {
+                const res = await apiRequest(`${API_BASE}/api/proxy/test`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ proxy: proxyUrl })
@@ -1997,7 +1997,7 @@
             reader.onload = async (e) => {
                 try {
                     const newConfig = JSON.parse(e.target.result);
-                    const res = await apiRequest(${API_BASE}/api/config/upload`, {
+                    const res = await apiRequest(`${API_BASE}/api/config/upload`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(newConfig)
