@@ -676,7 +676,7 @@
                     <label class="form-label" for="loginApiKey">API 密钥</label>
                     <div class="input-group">
                         <input type="password" class="form-input" id="loginApiKey" placeholder="请输入API密钥" autocomplete="off">
-                        <button type="button" class="btn btn-outline" onclick="toggleLoginKeyVisibility()" style="border-radius: 0 8px 8px 0;">
+                        <button type="button" class="btn btn-outline password-toggle-btn" style="border-radius: 0 8px 8px 0;">
                             <svg class="icon" style="font-size: 1rem;"><use xlink:href="#icon-eye"></use></svg>
                         </button>
                     </div>
@@ -1166,24 +1166,55 @@
             initTheme();
             checkAuthStatus(); // 检查鉴权状态
             setInterval(checkServerStatus, 30000); // 每30秒检查一次服务状态
-
-            // 添加登录按钮事件监听器
-            const loginBtn = document.getElementById('loginBtn');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', doLogin);
-                console.log('Login button event listener attached');
-            }
-
-            // 添加回车键登录支持
-            const loginApiKeyInput = document.getElementById('loginApiKey');
-            if (loginApiKeyInput) {
-                loginApiKeyInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        doLogin();
-                    }
-                });
-            }
         });
+
+        // --- 登录事件绑定函数 ---
+        function bindLoginEvents() {
+            console.log('Binding login events...');
+
+            // 使用更直接的方法绑定事件
+            setTimeout(() => {
+                // 绑定登录按钮
+                const loginBtn = document.getElementById('loginBtn');
+                if (loginBtn) {
+                    // 直接设置onclick属性
+                    loginBtn.onclick = doLogin;
+                    console.log('Login button onclick set directly');
+                } else {
+                    console.log('Login button not found');
+                }
+
+                // 绑定密码显示切换按钮
+                const passwordToggleBtn = document.querySelector('.password-toggle-btn');
+                if (passwordToggleBtn) {
+                    // 直接设置onclick属性
+                    passwordToggleBtn.onclick = toggleLoginKeyVisibility;
+                    console.log('Password toggle button onclick set directly');
+                } else {
+                    console.log('Password toggle button not found');
+                }
+
+                // 绑定回车键登录支持
+                const loginApiKeyInput = document.getElementById('loginApiKey');
+                if (loginApiKeyInput) {
+                    loginApiKeyInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            doLogin();
+                        }
+                    });
+                    console.log('Enter key listener attached to login input');
+                } else {
+                    console.log('Login API key input not found');
+                }
+
+                // 验证绑定结果
+                console.log('Event binding verification:', {
+                    loginBtn: !!document.getElementById('loginBtn'),
+                    passwordToggleBtn: !!document.querySelector('.password-toggle-btn'),
+                    loginApiKeyInput: !!document.getElementById('loginApiKey')
+                });
+            }, 50);
+        }
 
         // --- 鉴权状态检查和登录功能 ---
         async function checkAuthStatus() {
@@ -1241,6 +1272,11 @@
         function showLoginScreen() {
             document.getElementById('loginScreen').style.display = 'flex';
             document.getElementById('mainContainer').classList.add('main-container-hidden');
+
+            // 确保登录界面显示后再绑定事件
+            setTimeout(() => {
+                bindLoginEvents();
+            }, 100);
         }
 
         function showMainInterface() {
@@ -1341,6 +1377,38 @@
                 showToast('已成功退出登录', 'success');
             }
         }
+
+        // --- 测试函数 ---
+        window.testLoginFunctions = function() {
+            console.log('Testing login functions...');
+            console.log('doLogin function:', typeof doLogin);
+            console.log('toggleLoginKeyVisibility function:', typeof toggleLoginKeyVisibility);
+
+            const loginBtn = document.getElementById('loginBtn');
+            const passwordToggleBtn = document.querySelector('.password-toggle-btn');
+            const loginApiKeyInput = document.getElementById('loginApiKey');
+
+            console.log('Elements found:', {
+                loginBtn: !!loginBtn,
+                passwordToggleBtn: !!passwordToggleBtn,
+                loginApiKeyInput: !!loginApiKeyInput
+            });
+
+            if (loginBtn) {
+                console.log('Login btn onclick:', loginBtn.onclick);
+                loginBtn.onclick = function() {
+                    console.log('Login button clicked!');
+                    doLogin();
+                };
+            }
+
+            if (passwordToggleBtn) {
+                passwordToggleBtn.onclick = function() {
+                    console.log('Password toggle clicked!');
+                    toggleLoginKeyVisibility();
+                };
+            }
+        };
 
         // --- 通用 API 请求函数 ---
         function getApiHeaders() {
