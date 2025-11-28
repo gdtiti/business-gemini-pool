@@ -38,9 +38,12 @@ coverage.xml
 .pytest_cache
 .hypothesis
 
-# Documentation (keep README)
+# Documentation (keep README and gallery features)
 *.md
 !README.md
+!README_HF.md
+!HISTORY_SESSION_FEATURE.md
+!CONTRIBUTING.md
 !docs/
 docs/*.md
 
@@ -98,10 +101,33 @@ temp/
 tmp/
 *.tmp
 
-# Database files
+# Development and test scripts (keep production files)
+test_*.py
+debug_*.py
+*_test*.py
+fix_*.py
+add_*.py
+cleanup_*.py
+quick_*.py
+simple_*.py
+update_*.py
+final_*.py
+
+# Development HTML files
+test_*.html
+markdown_test.html
+test_image_fix.html
+
+# Development databases
+conversations.db
+*.log
+
+# Database files (exclude runtime DB, but keep database.py)
 *.sqlite
 *.sqlite3
-*.db
+conversations.db
+!database.py
+!schema.sql
 
 # Build artifacts
 build/

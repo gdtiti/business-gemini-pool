@@ -2215,8 +2215,15 @@ def get_user_id_from_request():
     if not api_key:
         return None
 
-    conversation_manager = get_conversation_manager()
-    return conversation_manager.get_user_id(api_key)
+    # 检查数据库模块是否可用
+    if get_conversation_manager is not None:
+        conversation_manager = get_conversation_manager()
+        return conversation_manager.get_user_id(api_key)
+    else:
+        print("[警告] 数据库模块不可用，使用默认用户ID")
+        # 当数据库不可用时，返回基于API key的哈希作为临时用户ID（字符串格式）
+        import hashlib
+        return hashlib.md5(api_key.encode()).hexdigest()[:8]
 
 @app.route('/v1/conversations', methods=['GET'])
 @require_api_key
