@@ -25,7 +25,14 @@ from flask import Flask, request, Response, jsonify, send_from_directory, abort
 from flask_cors import CORS
 
 # 导入数据库管理器
-from database import get_conversation_manager, Conversation, Message
+try:
+    from database import get_conversation_manager, Conversation, Message
+    print("数据库模块加载成功")
+except ImportError as e:
+    print(f"警告: 无法导入数据库模块，某些功能可能无法使用: {e}")
+    get_conversation_manager = None
+    Conversation = None
+    Message = None
 
 # 禁用SSL警告
 import urllib3
@@ -803,41 +810,44 @@ def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filenam
         # 如果提供了用户ID，同时保存到数据库
         if user_id:
             try:
-                conversation_manager = get_conversation_manager()
+                if get_conversation_manager is not None:
+                    conversation_manager = get_conversation_manager()
 
-                # 获取图片尺寸信息
-                image_width = None
-                image_height = None
-                try:
-                    # 尝试导入PIL，如果失败则跳过尺寸获取
-                    import PIL
-                    from PIL import Image as PILImage
-                    import io
-                    img = PILImage.open(io.BytesIO(image_data))
-                    image_width, image_height = img.size
-                except ImportError:
-                    pass  # PIL未安装，跳过尺寸获取
-                except Exception:
-                    pass  # 如果无法获取图片尺寸，跳过
+                    # 获取图片尺寸信息
+                    image_width = None
+                    image_height = None
+                    try:
+                        # 尝试导入PIL，如果失败则跳过尺寸获取
+                        import PIL
+                        from PIL import Image as PILImage
+                        import io
+                        img = PILImage.open(io.BytesIO(image_data))
+                        image_width, image_height = img.size
+                    except ImportError:
+                        pass  # PIL未安装，跳过尺寸获取
+                    except Exception:
+                        pass  # 如果无法获取图片尺寸，跳过
 
-                # 保存到数据库
-                image_id = conversation_manager.add_image(
-                    filename=filename,
-                    file_path=str(IMAGE_CACHE_DIR / filename),
-                    user_id=user_id,
-                    file_size=len(image_data),
-                    image_width=image_width,
-                    image_height=image_height,
-                    mime_type=mime_type,
-                    conversation_id=conversation_id,
-                    prompt=prompt,
-                    title=f"生成图片_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                )
+                    # 保存到数据库
+                    image_id = conversation_manager.add_image(
+                        filename=filename,
+                        file_path=str(IMAGE_CACHE_DIR / filename),
+                        user_id=user_id,
+                        file_size=len(image_data),
+                        image_width=image_width,
+                        image_height=image_height,
+                        mime_type=mime_type,
+                        conversation_id=conversation_id,
+                        prompt=prompt,
+                        title=f"生成图片_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    )
 
-                if image_id > 0:
-                    print(f"[图片数据库] 保存成功: {filename} (ID: {image_id})")
+                    if image_id > 0:
+                        print(f"[图片数据库] 保存成功: {filename} (ID: {image_id})")
+                    else:
+                        print(f"[图片数据库] 保存失败: {filename}")
                 else:
-                    print(f"[图片数据库] 保存失败: {filename}")
+                    print("[警告] 数据库模块不可用，跳过图片数据库保存")
 
             except Exception as db_error:
                 print(f"[图片数据库] 保存失败: {filename}, 错误: {db_error}")
