@@ -232,10 +232,7 @@
             to { opacity: 1; }
         }
 
-        .login-container {
-            animation: slideUp 0.4s ease-out;
-        }
-
+        
         @keyframes slideUp {
             from {
                 opacity: 0;
@@ -519,13 +516,15 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             background: var(--bg-main);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 9999;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
         }
 
         .login-container {
@@ -537,6 +536,7 @@
             max-width: 420px;
             margin: 20px;
             border: 1px solid var(--border);
+            animation: slideUp 0.4s ease-out;
         }
 
         .login-header {
@@ -683,7 +683,7 @@
                     <small>请输入有效的API密钥以访问管理界面</small>
                 </div>
 
-                <button type="button" class="btn btn-primary full-width" onclick="doLogin()" id="loginBtn">
+                <button type="button" class="btn btn-primary full-width" id="loginBtn">
                     <svg class="icon"><use xlink:href="#icon-send"></use></svg>
                     登录
                 </button>
@@ -1167,6 +1167,13 @@
             checkAuthStatus(); // 检查鉴权状态
             setInterval(checkServerStatus, 30000); // 每30秒检查一次服务状态
 
+            // 添加登录按钮事件监听器
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginBtn) {
+                loginBtn.addEventListener('click', doLogin);
+                console.log('Login button event listener attached');
+            }
+
             // 添加回车键登录支持
             const loginApiKeyInput = document.getElementById('loginApiKey');
             if (loginApiKeyInput) {
@@ -1243,6 +1250,13 @@
         }
 
         async function doLogin() {
+            console.log('doLogin function called'); // 调试信息
+            console.log('Available elements:', {
+                loginApiKey: !!document.getElementById('loginApiKey'),
+                loginBtn: !!document.getElementById('loginBtn'),
+                loginStatus: !!document.getElementById('loginStatus')
+            });
+
             const apiKey = document.getElementById('loginApiKey').value;
             const loginBtn = document.getElementById('loginBtn');
             const loginStatus = document.getElementById('loginStatus');
@@ -1300,10 +1314,14 @@
 
             if (apiKeyInput.type === 'password') {
                 apiKeyInput.type = 'text';
-                icon.setAttribute('xlink:href', '#icon-eye-off');
+                if (icon) {
+                    icon.setAttribute('xlink:href', '#icon-eye');
+                }
             } else {
                 apiKeyInput.type = 'password';
-                icon.setAttribute('xlink:href', '#icon-eye');
+                if (icon) {
+                    icon.setAttribute('xlink:href', '#icon-eye');
+                }
             }
         }
 
