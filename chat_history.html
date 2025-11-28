@@ -371,6 +371,17 @@
             border-color: var(--primary);
         }
 
+        .theme-toggle.conversation {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .theme-toggle.conversation:hover {
+            background: var(--primary);
+            color: white;
+        }
+
         /* 加载动画 */
         .typing-indicator {
             display: flex;
@@ -743,6 +754,9 @@
             </div>
             <button class="theme-toggle clear" onclick="clearChat()" title="清空对话">
                 🗑️ 清空
+            </button>
+            <button class="theme-toggle conversation" onclick="window.location.href='/conversation_manager.html'" title="会话管理">
+                📝 会话管理
             </button>
             <button class="theme-toggle home" onclick="window.location.href='/'" title="返回首页">
                 <span>🏠&nbsp;返回首页</span>
@@ -1727,23 +1741,148 @@
         }
 
         // ==================== 对话历史管理 ====================
-        function saveChatHistory() {
+        async function saveChatHistory() {
             try {
+                // 保存到localStorage（作为备份）
                 localStorage.setItem('Business Gemini_chat_history', JSON.stringify(chatHistory));
+
+                // 同时保存到会话管理系统
+                await saveMessagesToConversationManager();
             } catch (e) {
                 console.error('保存对话历史失败:', e);
             }
         }
 
-        function loadChatHistory() {
+        // 将消息保存到会话管理系统
+        async function saveMessagesToConversationManager() {
             try {
+                // 获取当前活跃会话
+                const activeResponse = await fetch('/v1/conversations/active', {
+                    headers: getApiHeaders()
+                });
+
+                if (!activeResponse.ok) {
+                    console.log('无法获取活跃会话，跳过保存到数据库');
+                    return;
+                }
+
+                const activeData = await activeResponse.json();
+                if (!activeData.conversation) {
+                    console.log('没有活跃会话，跳过保存到数据库');
+                    return;
+                }
+
+                const conversationId = activeData.conversation.id;
+
+                // 清除旧消息（避免重复）
+                await clearConversationMessages(conversationId);
+
+                // 保存新消息
+                for (const msg of chatHistory) {
+                    await fetch(`/v1/conversations/${conversationId}/messages`, {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            role: msg.role === 'ai' ? 'assistant' : 'user',
+                            content: msg.content,
+                            message_type: 'text'
+                        })
+                    });
+                }
+
+                console.log('已保存', chatHistory.length, '条消息到会话', conversationId);
+
+            } catch (error) {
+                console.error('保存消息到会话管理系统失败:', error);
+            }
+        }
+
+        // 清除会话的消息
+        async function clearConversationMessages(conversationId) {
+            try {
+                const response = await fetch(`/v1/conversations/${conversationId}/messages`, {
+                    method: 'DELETE',
+                    headers: getApiHeaders()
+                });
+
+                if (response.ok) {
+                    console.log('清除会话消息成功:', conversationId);
+                } else {
+                    console.log('清除会话消息失败:', response.status);
+                }
+            } catch (error) {
+                console.error('清除会话消息失败:', error);
+            }
+        }
+
+        async function loadChatHistory() {
+            try {
+                // 首先尝试从会��管理系统加载活跃会话
+                const activeConversation = await loadActiveConversationMessages();
+                if (activeConversation && activeConversation.length > 0) {
+                    chatHistory = activeConversation;
+                    console.log('从会话管理系统加载了', activeConversation.length, '条消息');
+                    return;
+                }
+
+                // 如果会话管理系统没有消息，回退��localStorage
                 const saved = localStorage.getItem('Business Gemini_chat_history');
                 if (saved) {
                     chatHistory = JSON.parse(saved);
+                    console.log('从localStorage加载了', chatHistory.length, '条消息');
+                } else {
+                    chatHistory = [];
                 }
             } catch (e) {
                 console.error('加载对话历史失败:', e);
                 chatHistory = [];
+            }
+        }
+
+        // 从会话管理系统加载活跃会话的消息
+        async function loadActiveConversationMessages() {
+            try {
+                const response = await fetch('/v1/conversations/active', {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) {
+                    console.log('无法获取活跃会话');
+                    return null;
+                }
+
+                const data = await response.json();
+                if (!data.conversation) {
+                    console.log('没有活跃会话');
+                    return null;
+                }
+
+                // 获取会话消息
+                const messagesResponse = await fetch(`/v1/conversations/${data.conversation.id}/messages?limit=1000`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!messagesResponse.ok) {
+                    console.log('无法获取会话消息');
+                    return null;
+                }
+
+                const messagesData = await messagesResponse.json();
+                const messages = messagesData.messages || [];
+
+                // 将消息格式转换为chatHistory格式
+                const chatHistory = messages.map(msg => ({
+                    role: msg.role === 'assistant' ? 'ai' : 'user',
+                    content: msg.content,
+                    time: msg.timestamp
+                }));
+
+                console.log('从数据库加载了', chatHistory.length, '条消息');
+                return chatHistory;
+
+            } catch (error) {
+                console.error('从会话管理系统加载消息失败:', error);
+                return null;
             }
         }
 

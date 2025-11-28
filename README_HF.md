@@ -53,7 +53,7 @@ license: mit
 
 - `MODELS_CONFIG`: 模型配置JSON数组（如不设置将使用默认模型）
   ```
-  [{"id":"gemini-enterprise","name":"Gemini Enterprise","description":"Google Gemini Enterprise 模型","context_length":32768,"max_tokens":8192,"enabled":true}]
+  [{"id":"gemini-enterprise","name":"Gemini Enterprise","description":"Google Gemini Enterprise 模型","context_length":32768,"max_tokens":8192,"enabled":true},{"id":"gemini-enterprise2","name":"Gemini Enterprise","description":"Google Gemini Enterprise 模型","context_length":32768,"max_tokens":8192,"enabled":true}]
   ```
 
 ### 配置步骤

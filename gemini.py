@@ -24,6 +24,9 @@ from typing import List, Optional, Dict, Any
 from flask import Flask, request, Response, jsonify, send_from_directory, abort
 from flask_cors import CORS
 
+# 导入数据库管理器
+from database import get_conversation_manager, Conversation, Message
+
 # 禁用SSL警告
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -764,7 +767,9 @@ def cleanup_expired_images():
                 print(f"[图片缓存] 删除失败: {filepath.name}, 错误: {e}")
 
 
-def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filename: Optional[str] = None) -> str:
+def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filename: Optional[str] = None,
+                        user_id: Optional[str] = None, conversation_id: Optional[int] = None,
+                        prompt: Optional[str] = None) -> str:
     """保存图片到缓存目录，返回文件名
 
     注意：在HuggingFace Space等无状态环境中，图片文件可能无法持久化存储
@@ -794,6 +799,49 @@ def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filenam
             f.write(image_data)
 
         print(f"[图片缓存] 保存成功: {filename} ({len(image_data)} bytes)")
+
+        # 如果提供了用户ID，同时保存到数据库
+        if user_id:
+            try:
+                conversation_manager = get_conversation_manager()
+
+                # 获取图片尺寸信息
+                image_width = None
+                image_height = None
+                try:
+                    # 尝试导入PIL，如果失败则跳过尺寸获取
+                    import PIL
+                    from PIL import Image as PILImage
+                    import io
+                    img = PILImage.open(io.BytesIO(image_data))
+                    image_width, image_height = img.size
+                except ImportError:
+                    pass  # PIL未安装，跳过尺寸获取
+                except Exception:
+                    pass  # 如果无法获取图片尺寸，跳过
+
+                # 保存到数据库
+                image_id = conversation_manager.add_image(
+                    filename=filename,
+                    file_path=str(IMAGE_CACHE_DIR / filename),
+                    user_id=user_id,
+                    file_size=len(image_data),
+                    image_width=image_width,
+                    image_height=image_height,
+                    mime_type=mime_type,
+                    conversation_id=conversation_id,
+                    prompt=prompt,
+                    title=f"生成图片_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                )
+
+                if image_id > 0:
+                    print(f"[图片数据库] 保存成功: {filename} (ID: {image_id})")
+                else:
+                    print(f"[图片数据库] 保存失败: {filename}")
+
+            except Exception as db_error:
+                print(f"[图片数据库] 保存失败: {filename}, 错误: {db_error}")
+
         return filename
     except Exception as e:
         print(f"[图片缓存] 保存失败: {filename}, 错误: {e}")
@@ -1004,8 +1052,10 @@ def upload_inline_image_to_gemini(jwt: str, session_name: str, team_id: str,
         return None
 
 
-def stream_chat_with_images(jwt: str, sess_name: str, message: str, 
-                            proxy: str, team_id: str, file_ids: List[str] = None) -> ChatResponse:
+def stream_chat_with_images(jwt: str, sess_name: str, message: str,
+                            proxy: str, team_id: str, file_ids: List[str] = None,
+                            user_id: Optional[str] = None, conversation_id: Optional[int] = None,
+                            prompt: Optional[str] = None) -> ChatResponse:
     """发送消息并流式接收响应"""
     query_parts = [{"text": message}]
     request_file_ids = file_ids if file_ids else []
@@ -1071,18 +1121,18 @@ def stream_chat_with_images(jwt: str, sess_name: str, message: str,
             
             # 检查顶层的generatedImages
             for gen_img in sar.get("generatedImages", []):
-                parse_generated_image(gen_img, result, proxy)
-            
+                parse_generated_image(gen_img, result, proxy, user_id, conversation_id, prompt)
+
             answer = sar.get("answer") or {}
-            
+
             # 检查answer级别的generatedImages
             for gen_img in answer.get("generatedImages", []):
-                parse_generated_image(gen_img, result, proxy)
-            
+                parse_generated_image(gen_img, result, proxy, user_id, conversation_id, prompt)
+
             for reply in answer.get("replies", []):
                 # 检查reply级别的generatedImages
                 for gen_img in reply.get("generatedImages", []):
-                    parse_generated_image(gen_img, result, proxy)
+                    parse_generated_image(gen_img, result, proxy, user_id, conversation_id, prompt)
                 
                 gc = reply.get("groundedContent", {})
                 content = gc.get("content", {})
@@ -1099,12 +1149,12 @@ def stream_chat_with_images(jwt: str, sess_name: str, message: str,
                     })
                 
                 # 解析图片数据
-                parse_image_from_content(content, result, proxy)
-                parse_image_from_content(gc, result, proxy)
+                parse_image_from_content(content, result, proxy, user_id, conversation_id, prompt)
+                parse_image_from_content(gc, result, proxy, user_id, conversation_id, prompt)
                 
                 # 检查attachments
                 for att in reply.get("attachments", []) + gc.get("attachments", []) + content.get("attachments", []):
-                    parse_attachment(att, result, proxy)
+                    parse_attachment(att, result, proxy, user_id, conversation_id, prompt)
                 
                 if text and not thought:
                     texts.append(text)
@@ -1148,7 +1198,9 @@ def stream_chat_with_images(jwt: str, sess_name: str, message: str,
     return result
 
 
-def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[str] = None):
+def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[str] = None,
+                         user_id: Optional[str] = None, conversation_id: Optional[int] = None,
+                         prompt: Optional[str] = None):
     """解析generatedImages中的图片"""
     image_data = gen_img.get("image")
     if not image_data:
@@ -1160,7 +1212,8 @@ def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[s
         try:
             decoded = base64.b64decode(b64_data)
             mime_type = image_data.get("mimeType", "image/png")
-            filename = save_image_to_cache(decoded, mime_type)
+            filename = save_image_to_cache(decoded, mime_type, user_id=user_id,
+                                          conversation_id=conversation_id, prompt=prompt)
             img = ChatImage(
                 base64_data=b64_data,
                 mime_type=mime_type,
@@ -1173,7 +1226,9 @@ def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[s
             print(f"[图片] 解析base64失败: {e}")
 
 
-def parse_image_from_content(content: Dict, result: ChatResponse, proxy: Optional[str] = None):
+def parse_image_from_content(content: Dict, result: ChatResponse, proxy: Optional[str] = None,
+                             user_id: Optional[str] = None, conversation_id: Optional[int] = None,
+                             prompt: Optional[str] = None):
     """从content中解析图片"""
     # 检查inlineData
     inline_data = content.get("inlineData")
@@ -1183,7 +1238,8 @@ def parse_image_from_content(content: Dict, result: ChatResponse, proxy: Optiona
             try:
                 decoded = base64.b64decode(b64_data)
                 mime_type = inline_data.get("mimeType", "image/png")
-                filename = save_image_to_cache(decoded, mime_type)
+                filename = save_image_to_cache(decoded, mime_type, user_id=user_id,
+                                              conversation_id=conversation_id, prompt=prompt)
                 img = ChatImage(
                     base64_data=b64_data,
                     mime_type=mime_type,
@@ -1196,7 +1252,9 @@ def parse_image_from_content(content: Dict, result: ChatResponse, proxy: Optiona
                 print(f"[图片] 解析inlineData失败: {e}")
 
 
-def parse_attachment(att: Dict, result: ChatResponse, proxy: Optional[str] = None):
+def parse_attachment(att: Dict, result: ChatResponse, proxy: Optional[str] = None,
+                      user_id: Optional[str] = None, conversation_id: Optional[int] = None,
+                      prompt: Optional[str] = None):
     """解析attachment中的图片"""
     # 检查是否是图片类型
     mime_type = att.get("mimeType", "")
@@ -1209,7 +1267,8 @@ def parse_attachment(att: Dict, result: ChatResponse, proxy: Optional[str] = Non
         try:
             decoded = base64.b64decode(b64_data)
             filename = att.get("name") or None
-            filename = save_image_to_cache(decoded, mime_type, filename)
+            filename = save_image_to_cache(decoded, mime_type, filename, user_id=user_id,
+                                          conversation_id=conversation_id, prompt=prompt)
             img = ChatImage(
                 base64_data=b64_data,
                 mime_type=mime_type,
@@ -1444,6 +1503,18 @@ def chat_completions():
         chat_logger.info(f"聊天请求开始 - IP: {client_ip}, 用户代理: {user_agent}")
         chat_logger.debug(f"请求参数: 模型={model}, 流式={stream}, 消息数量={len(messages)}")
 
+        # 获取用户ID和活跃会话信息（用于图片保存）
+        user_id = get_user_id_from_request()
+        active_conversation_id = None
+        if user_id:
+            try:
+                conversation_manager = get_conversation_manager()
+                active_conversation = conversation_manager.get_active_conversation(user_id)
+                if active_conversation:
+                    active_conversation_id = active_conversation.id
+            except Exception as e:
+                chat_logger.warning(f"获取��跃会话失败: {e}")
+
         # 每次请求时清理过期图片
         cleanup_expired_images()
 
@@ -1536,7 +1607,11 @@ def chat_completions():
                 chat_logger.info(f"图片上传完成: {uploaded_count}/{len(input_images)} 张图片成功上传")
                 chat_logger.debug(f"开始发送聊天请求，文件总数: {len(gemini_file_ids)}")
 
-                chat_response = stream_chat_with_images(jwt, session, user_message, proxy, team_id, gemini_file_ids)
+                # 提取用户消息作为提示词
+                prompt_for_images = user_message if user_message else None
+
+                chat_response = stream_chat_with_images(jwt, session, user_message, proxy, team_id,
+                                                     gemini_file_ids, user_id, active_conversation_id, prompt_for_images)
                 chat_logger.info(f"账号 {account_idx+1} 请求成功")
                 break
             except Exception as e:
@@ -1814,6 +1889,16 @@ def index():
 def chat_history():
     """返回聊天记录页面"""
     return send_from_directory('.', 'chat_history.html')
+
+@app.route('/conversation_manager.html')
+def conversation_manager():
+    """返回会话管理页面"""
+    return send_from_directory('.', 'conversation_manager.html')
+
+@app.route('/image_gallery.html')
+def image_gallery():
+    """返回图片相册页面"""
+    return send_from_directory('.', 'image_gallery.html')
 
 @app.route('/api/accounts', methods=['GET'])
 @require_api_key
@@ -2110,6 +2195,761 @@ def get_proxy_status():
 def export_config():
     """导出配置"""
     return jsonify(account_manager.config)
+
+
+# ==================== 历史会话管理API ====================
+
+def get_user_id_from_request():
+    """从请求中获取用户ID"""
+    api_key = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not api_key:
+        return None
+
+    conversation_manager = get_conversation_manager()
+    return conversation_manager.get_user_id(api_key)
+
+@app.route('/v1/conversations', methods=['GET'])
+@require_api_key
+def get_conversations():
+    """获取用户的会话列表"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+
+        # 获取查询参数
+        limit = min(int(request.args.get('limit', 50)), 100)  # 最大100条
+        offset = max(int(request.args.get('offset', 0)), 0)
+        search = request.args.get('search', '').strip()
+
+        if search:
+            conversations = conversation_manager.search_conversations(user_id, search, limit)
+        else:
+            conversations = conversation_manager.get_conversations(user_id, limit, offset)
+
+        # 转换为字典格式
+        result = []
+        for conv in conversations:
+            result.append({
+                'id': conv.id,
+                'session_id': conv.session_id,
+                'title': conv.title,
+                'model': conv.model,
+                'created_at': conv.created_at,
+                'updated_at': conv.updated_at,
+                'message_count': conv.message_count,
+                'is_active': conv.is_active
+            })
+
+        return jsonify({
+            "conversations": result,
+            "total": len(result),
+            "limit": limit,
+            "offset": offset
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取会话列表失败: {e}")
+        return jsonify({"error": "获取会话列表失败"}), 500
+
+@app.route('/v1/conversations', methods=['POST'])
+@require_api_key
+def create_conversation():
+    """创建新会话"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        data = request.get_json() or {}
+        title = data.get('title', '新对话').strip()
+        model = data.get('model', 'gemini-enterprise').strip()
+
+        if not title:
+            title = "新对话"
+
+        conversation_manager = get_conversation_manager()
+
+        # 如果用户有活跃会话，先将其设为非活跃
+        active_conv = conversation_manager.get_active_conversation(user_id)
+        if active_conv and active_conv.id:
+            conversation_manager.set_active_conversation(active_conv.id, user_id)
+
+        # 创建新会话
+        new_conversation = conversation_manager.create_conversation(
+            title=title,
+            model=model,
+            user_id=user_id
+        )
+
+        # 设为活跃会话
+        if new_conversation.id:
+            conversation_manager.set_active_conversation(new_conversation.id, user_id)
+
+        return jsonify({
+            "id": new_conversation.id,
+            "session_id": new_conversation.session_id,
+            "title": new_conversation.title,
+            "model": new_conversation.model,
+            "created_at": new_conversation.created_at,
+            "updated_at": new_conversation.updated_at,
+            "message_count": 0,
+            "is_active": True
+        }), 201
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"创建会话失败: {e}")
+        return jsonify({"error": "创建会话失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>', methods=['GET'])
+@require_api_key
+def get_conversation(conversation_id):
+    """获取指定会话详情"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        conversation = conversation_manager.get_conversation(conversation_id, user_id)
+
+        if not conversation:
+            return jsonify({"error": "会话不存在"}), 404
+
+        # 获取会话消息
+        messages = conversation_manager.get_messages(conversation_id, user_id, limit=1000)
+
+        # 转换消息格式
+        message_list = []
+        for msg in messages:
+            message_list.append({
+                'id': msg.id,
+                'role': msg.role,
+                'content': msg.content,
+                'timestamp': msg.timestamp,
+                'message_type': msg.message_type,
+                'file_metadata': msg.file_metadata,
+                'token_count': msg.token_count,
+                'model': msg.model
+            })
+
+        return jsonify({
+            "conversation": {
+                'id': conversation.id,
+                'session_id': conversation.session_id,
+                'title': conversation.title,
+                'model': conversation.model,
+                'created_at': conversation.created_at,
+                'updated_at': conversation.updated_at,
+                'message_count': conversation.message_count,
+                'is_active': conversation.is_active,
+                'metadata': conversation.metadata
+            },
+            "messages": message_list
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取会话详情失败: {e}")
+        return jsonify({"error": "获取会话详情失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>', methods=['PUT'])
+@require_api_key
+def update_conversation(conversation_id):
+    """更新会话信息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        data = request.get_json() or {}
+        allowed_fields = ['title', 'model', 'metadata']
+        updates = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if not updates:
+            return jsonify({"error": "没有可更新的字段"}), 400
+
+        conversation_manager = get_conversation_manager()
+        success = conversation_manager.update_conversation(conversation_id, user_id, **updates)
+
+        if not success:
+            return jsonify({"error": "会话不存在或更新失败"}), 404
+
+        return jsonify({"message": "更新成功"})
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"更新会话失败: {e}")
+        return jsonify({"error": "更新会话失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>', methods=['DELETE'])
+@require_api_key
+def delete_conversation(conversation_id):
+    """删除会话"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        success = conversation_manager.delete_conversation(conversation_id, user_id)
+
+        if not success:
+            return jsonify({"error": "会话不存在或删除失败"}), 404
+
+        return jsonify({"message": "删除成功"})
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"删除会话失败: {e}")
+        return jsonify({"error": "删除会话失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>/switch', methods=['POST'])
+@require_api_key
+def switch_conversation(conversation_id):
+    """切换到指定会话"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+
+        # 验证会话存在
+        conversation = conversation_manager.get_conversation(conversation_id, user_id)
+        if not conversation:
+            return jsonify({"error": "会话不存在"}), 404
+
+        # 设为活跃会话
+        success = conversation_manager.set_active_conversation(conversation_id, user_id)
+        if not success:
+            return jsonify({"error": "切换会话失败"}), 500
+
+        return jsonify({
+            "message": "切换成功",
+            "conversation": {
+                'id': conversation.id,
+                'session_id': conversation.session_id,
+                'title': conversation.title,
+                'model': conversation.model,
+                'is_active': True
+            }
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"切换会话失败: {e}")
+        return jsonify({"error": "切换会话失败"}), 500
+
+@app.route('/v1/conversations/active', methods=['GET'])
+@require_api_key
+def get_active_conversation():
+    """获取当前活跃会话"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        conversation = conversation_manager.get_active_conversation(user_id)
+
+        if not conversation:
+            return jsonify({"conversation": None})
+
+        return jsonify({
+            "conversation": {
+                'id': conversation.id,
+                'session_id': conversation.session_id,
+                'title': conversation.title,
+                'model': conversation.model,
+                'created_at': conversation.created_at,
+                'updated_at': conversation.updated_at,
+                'message_count': conversation.message_count,
+                'is_active': True,
+                'gemini_session_data': conversation.gemini_session_data
+            }
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取活跃会话失败: {e}")
+        return jsonify({"error": "获取活跃会话失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>/messages', methods=['POST'])
+@require_api_key
+def add_message_to_conversation(conversation_id):
+    """向会话添加消息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "��法识别用户"}), 401
+
+        # 验证会话存在
+        conversation_manager = get_conversation_manager()
+        conversation = conversation_manager.get_conversation(conversation_id, user_id)
+        if not conversation:
+            return jsonify({"error": "会话不存在"}), 404
+
+        data = request.get_json()
+        if not data or 'role' not in data or 'content' not in data:
+            return jsonify({"error": "缺少必需参数: role, content"}), 400
+
+        role = data['role']
+        content = data['content']
+        message_type = data.get('message_type', 'text')
+        file_metadata = data.get('file_metadata')
+        token_count = data.get('token_count', 0)
+        model = data.get('model', conversation.model)
+
+        if role not in ['user', 'assistant']:
+            return jsonify({"error": "role必须是'user'或'assistant'"}), 400
+
+        # 添加消息
+        message_id = conversation_manager.add_message(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            message_type=message_type,
+            file_metadata=file_metadata,
+            token_count=token_count,
+            model=model
+        )
+
+        return jsonify({
+            "message": "消息添加成功",
+            "message_id": message_id
+        }), 201
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"添加消息失败: {e}")
+        return jsonify({"error": "添加消息失败"}), 500
+
+@app.route('/v1/conversations/<int:conversation_id>/messages', methods=['DELETE'])
+@require_api_key
+def clear_conversation_messages(conversation_id):
+    """清除会话的所有消息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        # 验证会话存在
+        conversation_manager = get_conversation_manager()
+        conversation = conversation_manager.get_conversation(conversation_id, user_id)
+        if not conversation:
+            return jsonify({"error": "会话不存在"}), 404
+
+        # 清除消息
+        success = conversation_manager.clear_conversation_messages(conversation_id, user_id)
+        if success:
+            return jsonify({"message": "消息清除成功"}), 200
+        else:
+            return jsonify({"error": "清除消息失败"}), 500
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"清除消息失败: {e}")
+        return jsonify({"error": "清除消息失败"}), 500
+
+@app.route('/v1/conversations/statistics', methods=['GET'])
+@require_api_key
+def get_conversation_statistics():
+    """获取用户会话统计信息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        stats = conversation_manager.get_statistics(user_id)
+
+        return jsonify(stats)
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取统计信息失败: {e}")
+        return jsonify({"error": "获取统计信息失败"}), 500
+
+# ==================== 图片管理API ====================
+
+@app.route('/v1/images', methods=['GET'])
+@require_api_key
+def get_images():
+    """获取用户的图片列表（分页）- 直接从image目录读取"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        # 获取查询参数
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 20)), 100)  # 限制最大每页100张
+        search_query = request.args.get('search', '').strip()
+
+        # 直接从image目录读取图片文件
+        images_data = []
+        image_files = []
+
+        # 扫描image目录
+        try:
+            for filename in os.listdir(IMAGE_CACHE_DIR):
+                file_path = IMAGE_CACHE_DIR / filename
+                if file_path.is_file() and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                    # 获取文件信息
+                    stat = file_path.stat()
+
+                    # 应用搜索过滤
+                    if search_query and search_query.lower() not in filename.lower():
+                        continue
+
+                    # 获取图片尺寸（如果PIL可用）
+                    width = None
+                    height = None
+                    try:
+                        from PIL import Image as PILImage
+                        with PILImage.open(file_path) as img:
+                            width, height = img.size
+                    except ImportError:
+                        pass  # PIL不可用时跳过尺寸获取
+                    except Exception:
+                        pass  # 图片读取失败时跳过尺寸获取
+
+                    image_info = {
+                        'id': hash(filename) % (2**31),  # 使用文件名哈希作为临时ID
+                        'filename': filename,
+                        'original_filename': filename,  # 对于目录文件，原始文件名就是文件名
+                        'file_path': str(file_path),
+                        'file_size': stat.st_size,
+                        'image_width': width,
+                        'image_height': height,
+                        'mime_type': f"image/{filename.lower().split('.')[-1]}",
+                        'title': filename.replace('_', ' ').replace('.png', '').replace('.jpg', '').replace('.jpeg', ''),
+                        'description': f"Generated image: {filename}",
+                        'prompt': None,  # 从文件名无法获取原始提示词
+                        'conversation_id': None,
+                        'message_id': None,
+                        'user_id': user_id,
+                        'tags': [],
+                        'metadata': {'source': 'directory_scan'},
+                        'created_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        'url': f"/image/{filename}",
+                        'modified_time': stat.st_mtime
+                    }
+                    image_files.append((filename, stat.st_mtime, image_info))
+        except Exception as e:
+            logger = logging.getLogger('gemini_pool.api')
+            logger.error(f"扫描图片目录失败: {e}")
+            return jsonify({"error": "扫描图片目录失败"}), 500
+
+        # 按修改时间排序（最新的在前）
+        image_files.sort(key=lambda x: x[1], reverse=True)
+
+        # 分页处理
+        total_count = len(image_files)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_files = image_files[start_idx:end_idx]
+
+        # 提取图片信息
+        for _, _, image_info in paginated_files:
+            images_data.append(image_info)
+
+        # 计算分页信息
+        total_pages = (total_count + per_page - 1) // per_page
+
+        return jsonify({
+            'images': images_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_count': total_count,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
+            },
+            'source': 'directory_scan'  # 标识数据来源
+        })
+
+    except ValueError:
+        return jsonify({"error": "无效的参数"}), 400
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取图片列表失败: {e}")
+        return jsonify({"error": "获取图片列表失败"}), 500
+@app.route('/v1/images/<int:image_id>', methods=['GET'])
+@require_api_key
+def get_image(image_id):
+    """获取单张图片信息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        image = conversation_manager.get_image_by_id(image_id, user_id)
+
+        if not image:
+            return jsonify({"error": "图片不存在"}), 404
+
+        return jsonify({
+            'id': image.id,
+            'filename': image.filename,
+            'original_filename': image.original_filename,
+            'file_size': image.file_size,
+            'image_width': image.image_width,
+            'image_height': image.image_height,
+            'mime_type': image.mime_type,
+            'title': image.title,
+            'description': image.description,
+            'prompt': image.prompt,
+            'conversation_id': image.conversation_id,
+            'message_id': image.message_id,
+            'tags': image.tags,
+            'metadata': image.metadata,
+            'created_at': image.created_at,
+            'url': f"/image/{image.filename}"
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取图片信息失败: {e}")
+        return jsonify({"error": "获取图片信息失败"}), 500
+
+@app.route('/v1/images/<int:image_id>', methods=['PUT'])
+@require_api_key
+def update_image(image_id):
+    """更新图片信息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "请求数据不能为空"}), 400
+
+        conversation_manager = get_conversation_manager()
+        success = conversation_manager.update_image(image_id, user_id, **data)
+
+        if success:
+            return jsonify({"message": "图片信息更新成功"})
+        else:
+            return jsonify({"error": "图片不存在或更新失败"}), 404
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"更新图片信息失败: {e}")
+        return jsonify({"error": "更新图片信息失败"}), 500
+
+@app.route('/v1/images/<int:image_id>', methods=['DELETE'])
+@require_api_key
+def delete_image(image_id):
+    """删除图片"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        conversation_manager = get_conversation_manager()
+        success = conversation_manager.delete_image(image_id, user_id)
+
+        if success:
+            return jsonify({"message": "图片删除成功"})
+        else:
+            return jsonify({"error": "图片不存在或删除失败"}), 404
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"删除图片失败: {e}")
+        return jsonify({"error": "删除图片失败"}), 500
+
+@app.route('/v1/images/statistics', methods=['GET'])
+@require_api_key
+def get_image_statistics():
+    """获取用户图片统计信息"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        # 计算存储空间使用情况（直接从目录扫描）
+        total_size = 0
+        total_count = 0
+
+        try:
+            for filename in os.listdir(IMAGE_CACHE_DIR):
+                file_path = IMAGE_CACHE_DIR / filename
+                if file_path.is_file() and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                    stat = file_path.stat()
+                    total_size += stat.st_size
+                    total_count += 1
+        except Exception:
+            pass  # 如果计算失败，使用默认值
+
+        # 获取磁盘空间信息
+        try:
+            import shutil
+            total_space, free_space = shutil.disk_usage(IMAGE_CACHE_DIR)[:2]
+            used_space = total_space - free_space
+        except Exception:
+            total_space = free_space = used_space = 0
+
+        def format_bytes(bytes_value):
+            """格式化字节数为人类可读格式"""
+            if bytes_value == 0:
+                return "0 B"
+            for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+                if bytes_value < 1024.0:
+                    return f"{bytes_value:.1f} {unit}"
+                bytes_value /= 1024.0
+            return f"{bytes_value:.1f} PB"
+
+        return jsonify({
+            'total_images': total_count,
+            'storage_info': {
+                'image_directory': str(IMAGE_CACHE_DIR),
+                'total_size_bytes': total_size,
+                'total_size_human': format_bytes(total_size),
+                'disk_total_bytes': total_space,
+                'disk_total_human': format_bytes(total_space),
+                'disk_used_bytes': used_space,
+                'disk_used_human': format_bytes(used_space),
+                'disk_free_bytes': free_space,
+                'disk_free_human': format_bytes(free_space),
+                'usage_percentage': round((used_space / total_space * 100), 2) if total_space > 0 else 0
+            },
+            'last_updated': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"获取图片统计失败: {e}")
+        return jsonify({"error": "获取图片统计失败"}), 500
+
+@app.route('/v1/images/delete', methods=['POST'])
+@require_api_key
+def delete_image_by_filename():
+    """通过文件名删除图片"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        data = request.get_json()
+        if not data or 'filename' not in data:
+            return jsonify({"error": "请提供文件名"}), 400
+
+        filename = data['filename']
+        if not filename or not isinstance(filename, str):
+            return jsonify({"error": "无效的文件名"}), 400
+
+        # 安全检查：只允许图片文件名
+        allowed_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+        if not filename.lower().endswith(allowed_extensions):
+            return jsonify({"error": "不支持的文件类型"}), 400
+
+        # 构建文件路径
+        file_path = IMAGE_CACHE_DIR / filename
+
+        # 检查文件是否存在
+        if not file_path.exists():
+            return jsonify({"error": "文件不存在"}), 404
+
+        # 检查是否为文件
+        if not file_path.is_file():
+            return jsonify({"error": "无效的文件路径"}), 400
+
+        # 删除文件
+        try:
+            file_path.unlink()
+            logger = logging.getLogger('gemini_pool.api')
+            logger.info(f"用户 {user_id} 删除了图片: {filename}")
+
+            return jsonify({
+                "message": f"图片 {filename} 删除成功",
+                "filename": filename
+            })
+        except OSError as e:
+            logger = logging.getLogger('gemini_pool.api')
+            logger.error(f"删除文件失败: {filename}, 错误: {e}")
+            return jsonify({"error": "删除文件失败"}), 500
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"删除图片失败: {e}")
+        return jsonify({"error": "删除图片失败"}), 500
+
+@app.route('/v1/images/batch-delete', methods=['POST'])
+@require_api_key
+def batch_delete_images():
+    """批量删除图片"""
+    try:
+        user_id = get_user_id_from_request()
+        if not user_id:
+            return jsonify({"error": "无法识别用户"}), 401
+
+        data = request.get_json()
+        if not data or 'filenames' not in data:
+            return jsonify({"error": "请提供要删除的文件名列表"}), 400
+
+        filenames = data['filenames']
+        if not isinstance(filenames, list) or len(filenames) == 0:
+            return jsonify({"error": "无效的文件名列表"}), 400
+
+        if len(filenames) > 50:  # 限制批量删除数量
+            return jsonify({"error": "一次最多删除50张图片"}), 400
+
+        # 安全检查和删除
+        deleted_files = []
+        failed_files = []
+
+        for filename in filenames:
+            if not isinstance(filename, str):
+                failed_files.append({"filename": str(filename), "error": "无效的文件名"})
+                continue
+
+            # 只允许图片文件
+            allowed_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')
+            if not filename.lower().endswith(allowed_extensions):
+                failed_files.append({"filename": filename, "error": "不支持的文件类型"})
+                continue
+
+            file_path = IMAGE_CACHE_DIR / filename
+
+            if not file_path.exists():
+                failed_files.append({"filename": filename, "error": "文件不存在"})
+                continue
+
+            if not file_path.is_file():
+                failed_files.append({"filename": filename, "error": "无效的文件路径"})
+                continue
+
+            try:
+                file_path.unlink()
+                deleted_files.append(filename)
+            except OSError as e:
+                failed_files.append({"filename": filename, "error": f"删除失败: {str(e)}"})
+
+        logger = logging.getLogger('gemini_pool.api')
+        logger.info(f"用户 {user_id} 批量删除图片: 成功 {len(deleted_files)}, 失败 {len(failed_files)}")
+
+        return jsonify({
+            "message": f"批量删除完成",
+            "deleted_count": len(deleted_files),
+            "deleted_files": deleted_files,
+            "failed_count": len(failed_files),
+            "failed_files": failed_files
+        })
+
+    except Exception as e:
+        logger = logging.getLogger('gemini_pool.api')
+        logger.error(f"批量删除图片失败: {e}")
+        return jsonify({"error": "批量删除图片失败"}), 500
 
 
 def print_startup_info():
