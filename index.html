@@ -217,6 +217,36 @@
         .tab-content.active { display: block; animation: contentFadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         @keyframes contentFadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* 登录界面动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .login-screen {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .login-container {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         /* [OPTIMIZATION] 6. Card 样式优化 */
         .card {
             background: var(--card-bg);
@@ -484,6 +514,106 @@
             stroke-linejoin: round;
         }
 
+        /* 登录界面样式 */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            padding: 48px;
+            width: 100%;
+            max-width: 420px;
+            margin: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .login-header h1 {
+            margin: 16px 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .login-header p {
+            color: var(--text-muted);
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group .form-input {
+            flex: 1;
+            border-radius: 8px 0 0 8px;
+            border-right: none;
+        }
+
+        .input-group .btn {
+            border-radius: 0 8px 8px 0;
+            border-left: none;
+        }
+
+        .login-status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .login-status.success {
+            background: var(--success-light);
+            color: var(--success);
+            border: 1px solid rgba(22, 163, 74, 0.2);
+        }
+
+        .login-status.error {
+            background: var(--danger-light);
+            color: var(--danger);
+            border: 1px solid rgba(220, 53, 69, 0.2);
+        }
+
+        .login-footer {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .login-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* 主容器隐藏样式 */
+        .main-container-hidden {
+            display: none !important;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .container { padding: 24px 16px; }
@@ -522,9 +652,56 @@
         <symbol id="icon-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></symbol>
         <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></symbol>
         <symbol id="icon-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></symbol>
+        <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></symbol>
+        <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+        <symbol id="icon-eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></symbol>
+        <symbol id="icon-loading" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-6.219-8.56"></path></symbol>
     </svg>
 
-    <div class="container">
+    <!-- 登录界面 -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <div class="logo">
+                    <svg class="icon" style="font-size: 3rem; color: var(--primary);">
+                        <use xlink:href="#icon-robot"></use>
+                    </svg>
+                    <h1>Business Gemini Pool</h1>
+                    <p>API鉴权登录</p>
+                </div>
+            </div>
+
+            <div class="login-form">
+                <div class="form-group">
+                    <label class="form-label" for="loginApiKey">API 密钥</label>
+                    <div class="input-group">
+                        <input type="password" class="form-input" id="loginApiKey" placeholder="请输入API密钥" autocomplete="off">
+                        <button type="button" class="btn btn-outline" onclick="toggleLoginKeyVisibility()" style="border-radius: 0 8px 8px 0;">
+                            <svg class="icon" style="font-size: 1rem;"><use xlink:href="#icon-eye"></use></svg>
+                        </button>
+                    </div>
+                    <small>请输入有效的API密钥以访问管理界面</small>
+                </div>
+
+                <button type="button" class="btn btn-primary full-width" onclick="doLogin()" id="loginBtn">
+                    <svg class="icon"><use xlink:href="#icon-send"></use></svg>
+                    登录
+                </button>
+
+                <div class="login-status" id="loginStatus"></div>
+            </div>
+
+            <div class="login-footer">
+                <div class="login-info">
+                    <svg class="icon" style="color: var(--text-muted); font-size: 0.875rem;"><use xlink:href="#icon-info"></use></svg>
+                    <span>如果忘记API密钥，请联系系统管理员</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div id="mainContainer" class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
@@ -537,6 +714,10 @@
                     <svg class="icon" style="width: 16px; height: 16px;"><use xlink:href="#icon-message"></use></svg>
                     在线对话
                 </a>
+                <button class="btn btn-outline" onclick="logout()" title="退出登录" style="padding: 8px 16px; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                    <svg class="icon" style="width: 16px; height: 16px;"><use xlink:href="#icon-logout"></use></svg>
+                    退出
+                </button>
                 <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
                     <span id="themeIconContainer">
                         <svg class="icon"><use xlink:href="#icon-sun"></use></svg>
@@ -699,7 +880,7 @@
                                     <input type="checkbox" id="requireAuth" onchange="toggleApiKeyField()">
                                     启用API鉴权
                                 </label>
-                                <small>启用后，所有API请求都需要提供有效的API密钥</small>
+                                <small>⚠️ 注意：启用后需要同时在服务器环境变量中配置 DOWNSTREAM_API_KEY，否则服务将无法访问</small>
                             </div>
                             <div class="form-group" id="apiKeyGroup" style="display: none;">
                                 <label class="form-label" for="apiKey">API密钥</label>
@@ -983,15 +1164,172 @@
         // --- 初始化 ---
         document.addEventListener('DOMContentLoaded', () => {
             initTheme();
-            loadAllData();
+            checkAuthStatus(); // 检查鉴权状态
             setInterval(checkServerStatus, 30000); // 每30秒检查一次服务状态
+
+            // 添加回车键登录支持
+            const loginApiKeyInput = document.getElementById('loginApiKey');
+            if (loginApiKeyInput) {
+                loginApiKeyInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        doLogin();
+                    }
+                });
+            }
         });
+
+        // --- 鉴权状态检查和登录功能 ---
+        async function checkAuthStatus() {
+            try {
+                // 先测试服务器是否启用鉴权（使用公共接口）
+                const testResponse = await fetch(`${API_BASE}/api/public/status`);
+                if (testResponse.ok) {
+                    const statusData = await testResponse.json();
+                    const requireAuth = statusData.require_auth || false;
+
+                    if (requireAuth) {
+                        // 服务器启用鉴权，检查前端是否有保存的API key
+                        const savedApiKey = localStorage.getItem('apiKey');
+                        if (savedApiKey) {
+                            // 验证保存的API key是否有效
+                            const isValid = await validateApiKey(savedApiKey);
+                            if (isValid) {
+                                // API key有效，直接登录
+                                currentApiKey = savedApiKey;
+                                showMainInterface();
+                                return;
+                            }
+                        }
+                        // 需要登录
+                        showLoginScreen();
+                    } else {
+                        // 服务器未启用鉴权，直接显示主界面
+                        showMainInterface();
+                    }
+                } else {
+                    // 服务器状态异常，显示主界面但会提示错误
+                    showMainInterface();
+                }
+            } catch (error) {
+                console.log('Auth status check failed:', error);
+                // 默认显示主界面
+                showMainInterface();
+            }
+        }
+
+        async function validateApiKey(apiKey) {
+            try {
+                const response = await fetch(`${API_BASE}/v1/models`, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                return response.ok;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function showLoginScreen() {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainContainer').classList.add('main-container-hidden');
+        }
+
+        function showMainInterface() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainContainer').classList.remove('main-container-hidden');
+            loadAllData(); // 加载数据
+        }
+
+        async function doLogin() {
+            const apiKey = document.getElementById('loginApiKey').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginStatus = document.getElementById('loginStatus');
+
+            if (!apiKey) {
+                showLoginStatus('请输入API密钥', 'error');
+                return;
+            }
+
+            // 禁用登录按钮，显示加载状态
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<svg class="icon" style="animation: spin 1s linear infinite;"><use xlink:href="#icon-loading"></use></svg> 验证中...';
+            showLoginStatus('正在验证API密钥...', '');
+
+            try {
+                const isValid = await validateApiKey(apiKey);
+                if (isValid) {
+                    // 保存API key到localStorage
+                    currentApiKey = apiKey;
+                    localStorage.setItem('apiKey', apiKey);
+
+                    showLoginStatus('登录成功！', 'success');
+
+                    // 延迟显示主界面
+                    setTimeout(() => {
+                        showMainInterface();
+                        showToast('登录成功，欢迎回来！', 'success');
+                    }, 500);
+                } else {
+                    showLoginStatus('API密钥无效，请检查后重试', 'error');
+                }
+            } catch (error) {
+                showLoginStatus('网络连接失败，请稍后重试', 'error');
+            } finally {
+                // 恢复登录按钮
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<svg class="icon"><use xlink:href="#icon-send"></use></svg> 登录';
+            }
+        }
+
+        function showLoginStatus(message, type) {
+            const statusEl = document.getElementById('loginStatus');
+            statusEl.textContent = message;
+            statusEl.className = 'login-status';
+            if (type) {
+                statusEl.classList.add(type);
+            }
+            statusEl.style.display = 'block';
+        }
+
+        function toggleLoginKeyVisibility() {
+            const apiKeyInput = document.getElementById('loginApiKey');
+            const toggleButton = apiKeyInput.nextElementSibling;
+            const icon = toggleButton.querySelector('svg use');
+
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                icon.setAttribute('xlink:href', '#icon-eye-off');
+            } else {
+                apiKeyInput.type = 'password';
+                icon.setAttribute('xlink:href', '#icon-eye');
+            }
+        }
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                // 清除保存的API key
+                localStorage.removeItem('apiKey');
+                currentApiKey = '';
+
+                // 显示登录界面
+                showLoginScreen();
+
+                // 清空登录表单
+                document.getElementById('loginApiKey').value = '';
+                document.getElementById('loginStatus').style.display = 'none';
+
+                showToast('已成功退出登录', 'success');
+            }
+        }
 
         // --- 通用 API 请求函数 ---
         function getApiHeaders() {
             const headers = { 'Content-Type': 'application/json' };
 
-            // 如果有保存的 API key，添加到请求头
+            // 如果用户设置了 API key（通过界面配置），添加到请求头
+            // 但如果服务端没有启用鉴权，这个请求头会被忽略
             if (currentApiKey) {
                 headers['Authorization'] = `Bearer ${currentApiKey}`;
             }
@@ -1016,14 +1354,38 @@
             try {
                 const response = await fetch(url, finalOptions);
 
-                // 如果是401错误，提示可能是API key问题
+                // 根据不同的错误状态码提供具体的提示
                 if (response.status === 401) {
-                    showToast('API认证失败，请检查API密钥是否正确', 'error');
+                    const errorData = await response.json().catch(() => ({}));
+                    if (errorData.error?.type === 'configuration_error') {
+                        showToast('服务端需要配置API密钥，请联系管理员', 'error');
+                        setTimeout(() => switchTab('settings'), 2000);
+                    } else if (errorData.error?.type === 'authentication_required') {
+                        showToast('此功能需要API密钥，请在系统设置中配置', 'warning');
+                        setTimeout(() => switchTab('settings'), 1500);
+                    } else {
+                        showToast('API密钥无效，请检查配置', 'error');
+                    }
+                } else if (response.status === 503) {
+                    const errorData = await response.json().catch(() => ({}));
+                    if (errorData.error?.type === 'configuration_error') {
+                        showToast('服务端鉴权功能已启用但未配置密钥，请联系管理员', 'error');
+                    } else {
+                        showToast('服务暂时不可用，请稍后重试', 'error');
+                    }
                 }
 
                 return response;
             } catch (error) {
                 console.error('API request failed:', error);
+
+                // 网络错误提示
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    showToast('网络连接失败，请检查服务是否正常运行', 'error');
+                } else {
+                    showToast('请求失败: ' + error.message, 'error');
+                }
+
                 throw error;
             }
         }
@@ -1093,18 +1455,49 @@
             if (apiKey) {
                 currentApiKey = apiKey;
                 localStorage.setItem('apiKey', apiKey);
-                showToast('API密钥已保存', 'success');
+                showToast('API密钥已保存，正在重新加载数据...', 'success');
+
+                // 重新加载数据以使用新的API key
+                setTimeout(() => {
+                    loadAllData();
+                }, 500);
             }
         }
 
         // --- 核心加载与渲染 ---
         async function loadAllData() {
-            await Promise.all([
-                loadAccounts(),
-                loadModels(),
-                loadConfig(),
-                checkServerStatus()
-            ]);
+            // 尝试加载所有数据，但如果鉴权失败，仍然显示基本界面
+            try {
+                await Promise.all([
+                    loadAccounts().catch(() => { showAuthRequiredMessage(); return null; }),
+                    loadModels().catch(() => null),
+                    loadConfig().catch(() => null),
+                    checkServerStatus().catch(() => null)
+                ]);
+            } catch (error) {
+                console.log('Initial load completed with some errors:', error);
+                // 即使加载失败，也初始化界面显示
+                showAuthRequiredMessage();
+            }
+        }
+
+        function showAuthRequiredMessage() {
+            // 检查是否已经有API key
+            if (!currentApiKey) {
+                // 显示鉴权提示，但不阻止界面使用
+                const statusIndicator = document.getElementById('serviceStatus');
+                if (statusIndicator) {
+                    statusIndicator.textContent = '需要鉴权配置';
+                    statusIndicator.title = '请先在系统设置中配置API密钥';
+                    statusIndicator.style.color = 'var(--warning)';
+                }
+
+                // 自动切换到系统设置标签页
+                setTimeout(() => {
+                    switchTab('settings');
+                    showToast('请先在系统设置中配置API密钥以使用完整功能', 'warning');
+                }, 1000);
+            }
         }
 
         // --- 主题控制 ---
@@ -1163,7 +1556,13 @@
                 renderAccounts();
                 updateAccountStats();
             } catch (e) {
-                showToast('加载账号列表失败: ' + e.message, 'error');
+                // 鉴权失败时静默处理，不显示错误toast
+                console.log('Accounts load failed, possibly due to auth:', e);
+                // 设置空数据，避免界面报错
+                accountsData = [];
+                document.getElementById('currentIndex').textContent = '0';
+                renderAccounts();
+                updateAccountStats();
             }
         }
 
@@ -1338,7 +1737,11 @@
                 modelsData = data.models || [];
                 renderModels();
             } catch (e) {
-                showToast('加载模型列表失败: ' + e.message, 'error');
+                // 鉴权失败时静默处理，不显示错误toast
+                console.log('Models load failed, possibly due to auth:', e);
+                // 设置空数据，避免界面报错
+                modelsData = [];
+                renderModels();
             }
         }
         
@@ -1424,7 +1827,13 @@
                 document.getElementById('proxyUrl').value = configData.proxy || '';
                 document.getElementById('configJson').value = JSON.stringify(configData, null, 2);
             } catch (e) {
-                showToast('加载配置失败: ' + e.message, 'error');
+                console.log('Config load failed:', e);
+                // 即使配置加载失败，也显示基本的表单
+                const configJsonEl = document.getElementById('configJson');
+                if (configJsonEl) {
+                    configJsonEl.value = '// 无法加载配置，可能需要API鉴权\n{\n  "message": "请配置API密钥后重试"\n}';
+                }
+                // 不显示错误toast，避免干扰用户
             }
         }
 

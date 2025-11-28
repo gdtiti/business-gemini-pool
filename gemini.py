@@ -52,21 +52,22 @@ def require_api_key(f):
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 加载配置检查是否需要鉴权
-        config = load_config_from_env()
+        # 检查环境变量是否启用鉴权
+        require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true'
 
-        if not config.get("require_auth", False):
+        if not require_auth:
             return f(*args, **kwargs)
 
         # 获取配置的 API key
-        required_api_key = config.get("downstream_api_key", "")
+        required_api_key = os.getenv('DOWNSTREAM_API_KEY', '')
         if not required_api_key:
             return jsonify({
                 "error": {
-                    "message": "Server configuration error: API key not configured",
-                    "type": "configuration_error"
+                    "message": "Server requires authentication but API key not configured",
+                    "type": "configuration_error",
+                    "suggestion": "Please set DOWNSTREAM_API_KEY environment variable"
                 }
-            }), 500
+            }), 503  # Service Unavailable 更合适
 
         # 从请求头获取 API key
         provided_api_key = request.headers.get('Authorization', '').replace('Bearer ', '').replace('Api-Key ', '')
@@ -74,8 +75,9 @@ def require_api_key(f):
         if not provided_api_key:
             return jsonify({
                 "error": {
-                    "message": "Missing API key in Authorization header",
-                    "type": "invalid_request_error"
+                    "message": "Authentication required",
+                    "type": "authentication_required",
+                    "suggestion": "Please provide API key in Authorization header"
                 }
             }), 401
 
@@ -83,7 +85,7 @@ def require_api_key(f):
             return jsonify({
                 "error": {
                     "message": "Invalid API key",
-                    "type": "invalid_request_error"
+                    "type": "authentication_failed"
                 }
             }), 401
 
@@ -1508,6 +1510,19 @@ def health_check():
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
 
+@app.route('/api/public/status', methods=['GET'])
+def public_status():
+    """获取公共系统状态（不需要鉴权）"""
+    require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true'
+
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "require_auth": require_auth,
+        "version": "Business Gemini Pool v1.0"
+    })
+
+
 @app.route('/api/status', methods=['GET'])
 @require_api_key
 def system_status():
@@ -1911,12 +1926,23 @@ def print_startup_info():
     print("  GET  /health              - 健康检查")
     print("  GET  /image/<filename>    - 获取缓存图片")
 
+    # 鉴权配置（从环境变量读取）
+    require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true'
+    api_key_status = "已配置" if os.getenv('DOWNSTREAM_API_KEY') else "未配置"
+
     print(f"\n[鉴权配置]")
-    require_auth = account_manager.config.get("require_auth", False)
-    api_key_status = "已配置" if account_manager.config.get("downstream_api_key") else "未配置"
-    print(f"  API鉴权: {'启用' if require_auth else '禁用'}")
+    print(f"  API鉴权状态: {'已启用' if require_auth else '未启用'} (环境变量 REQUIRE_AUTH)")
+
     if require_auth:
-        print(f"  API Key: {api_key_status}")
+        print(f"  环境变量 API Key: {api_key_status}")
+        print(f"  前端界面鉴权: 需要用户在管理界面中配置 API Key")
+
+        if not os.getenv('DOWNSTREAM_API_KEY'):
+            print("  ⚠️ 警告: 服务器端已启用鉴权但未配置 API KEY")
+            print("     请设置环境变量 DOWNSTREAM_API_KEY=your-secret-key")
+    else:
+        print("  前端界面鉴权: 当前未启用鉴权，无需配置 API Key")
+        print("   提示: 当前所有 API 请求都不需要鉴权")
 
     print(f"\n[环境变量配置示例]")
     print("  # JSON格式 (推荐)")
