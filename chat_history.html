@@ -528,6 +528,9 @@
     <div class="header">
         <h1>Business Gemini <span style="font-weight: 400; color: var(--text-muted); font-size: 0.8em; margin-left: 8px;">智能对话</span></h1>
         <div class="header-controls">
+            <div class="auth-status" id="authStatus" style="display: none; margin-right: 15px; padding: 5px 10px; background: var(--success-light); color: var(--success); border-radius: 12px; font-size: 12px;">
+                ✓ 已登录
+            </div>
             <div class="model-selector">
                 <label for="modelSelect">模型:</label>
                 <select id="modelSelect">
@@ -584,11 +587,79 @@
         let currentAIBubble = null;
         let abortController = null;
         let uploadedFiles = []; // 存储已上传的文件信息 {id, name, gemini_file_id}
+        let currentApiKey = localStorage.getItem('apiKey') || '';
+
+        // ==================== API 认证功能 ====================
+        function getApiHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+
+            // 如果用户设置��� API key（通过界面配置），添加到请求头
+            if (currentApiKey) {
+                headers['Authorization'] = `Bearer ${currentApiKey}`;
+            }
+
+            return headers;
+        }
+
+        async function apiRequest(url, options = {}) {
+            const defaultOptions = {
+                headers: getApiHeaders()
+            };
+
+            const finalOptions = {
+                ...defaultOptions,
+                ...options,
+                headers: {
+                    ...defaultOptions.headers,
+                    ...options.headers
+                }
+            };
+
+            try {
+                const response = await fetch(url, finalOptions);
+
+                // 根据不同的错误状态码提供具体的提示
+                if (response.status === 401) {
+                    const errorData = await response.json().catch(() => ({}));
+                    if (errorData.error?.type === 'configuration_error') {
+                        alert('服务端需要配置API密钥，请联系管理员');
+                    } else if (errorData.error?.type === 'authentication_required') {
+                        alert('此功能需要API密钥，请先在管理界面登录');
+                        // 可以选择跳转到管理界面
+                        window.location.href = '/';
+                    } else {
+                        alert('API密钥无效，请在管理界面重新登录');
+                        window.location.href = '/';
+                    }
+                } else if (response.status === 503) {
+                    const errorData = await response.json().catch(() => ({}));
+                    if (errorData.error?.type === 'configuration_error') {
+                        alert('服务端鉴权功能已启用但未配置密钥，请联系管理员');
+                    }
+                }
+
+                return response;
+            } catch (error) {
+                console.error('API request failed:', error);
+                alert('网络连接失败，请检查服务是否正常运行');
+                throw error;
+            }
+        }
+
+        // 检查API密钥状态
+        function checkApiKeyStatus() {
+            if (!currentApiKey) {
+                alert('未检测到API密钥，请先在管理界面登录');
+                window.location.href = '/';
+                return false;
+            }
+            return true;
+        }
 
         // ==================== 获取模型列表 ====================
         async function loadModelList() {
             try {
-                const response = await fetch('/api/models');
+                const response = await apiRequest('/api/models');
                 if (!response.ok) {
                     throw new Error('获取模型列表失败');
                 }
@@ -635,6 +706,21 @@
         // ==================== 初始化 ====================
         window.onload = () => {
             console.log('页面加载完成，开始初始化...');
+
+            // 检查API密钥状态
+            if (!checkApiKeyStatus()) {
+                return; // 如果没有API密钥，会自动跳转到管理界面
+            }
+
+            // 显示登录状态
+            const authStatus = document.getElementById('authStatus');
+            if (currentApiKey) {
+                authStatus.style.display = 'block';
+                authStatus.textContent = '✓ 已登录';
+                authStatus.style.background = 'var(--success-light)';
+                authStatus.style.color = 'var(--success)';
+            }
+
             loadChatHistory();
             loadModelList(); // 加载模型列表
             if (chatHistory.length === 0) {
@@ -678,6 +764,12 @@
         // ==================== 发送消息 ====================
         async function sendMessage() {
             console.log('sendMessage 被调用');
+
+            // 检查API密钥
+            if (!checkApiKeyStatus()) {
+                return;
+            }
+
             const input = document.getElementById('userInput');
             const text = input.value.trim();
             console.log('输入内容:', text, '加载状态:', isLoading);
@@ -732,11 +824,8 @@
             abortController = new AbortController();
             console.log('开始发送流式请求...');
 
-            const response = await fetch('/v1/chat/completions', {
+            const response = await apiRequest('/v1/chat/completions', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     model: getSelectedModel(),
                     messages: buildMessages(text),
@@ -805,11 +894,8 @@
 
             abortController = new AbortController();
 
-            const response = await fetch('/v1/chat/completions', {
+            const response = await apiRequest('/v1/chat/completions', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     model: getSelectedModel(),
                     messages: buildMessages(text),
@@ -1235,8 +1321,15 @@
                 formData.append('file', file);
                 formData.append('purpose', 'assistants');
                 
+                // 文件上传需要特殊的headers处理
+                const uploadHeaders = {};
+                if (currentApiKey) {
+                    uploadHeaders['Authorization'] = `Bearer ${currentApiKey}`;
+                }
+
                 const response = await fetch('/v1/files', {
                     method: 'POST',
+                    headers: uploadHeaders,
                     body: formData
                 });
                 
@@ -1313,7 +1406,7 @@
             }
             
             // 可选：调用删除API
-            fetch(`/v1/files/${fileId}`, { method: 'DELETE' }).catch(console.error);
+            apiRequest(`/v1/files/${fileId}`, { method: 'DELETE' }).catch(console.error);
         }
 
         function getUploadedFileIds() {
