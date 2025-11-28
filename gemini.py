@@ -1509,6 +1509,7 @@ def health_check():
 
 
 @app.route('/api/status', methods=['GET'])
+@require_api_key
 def system_status():
     """获取系统状态"""
     total, available = account_manager.get_account_count()
@@ -1542,6 +1543,7 @@ def chat_history():
     return send_from_directory('.', 'chat_history.html')
 
 @app.route('/api/accounts', methods=['GET'])
+@require_api_key
 def get_accounts():
     """获取账号列表"""
     accounts_data = []
@@ -1563,6 +1565,7 @@ def get_accounts():
 
 
 @app.route('/api/accounts', methods=['POST'])
+@require_api_key
 def add_account():
     """添加账号"""
     data = request.json
@@ -1591,6 +1594,7 @@ def add_account():
 
 
 @app.route('/api/accounts/<int:account_id>', methods=['PUT'])
+@require_api_key
 def update_account(account_id):
     """更新账号"""
     if account_id < 0 or account_id >= len(account_manager.accounts):
@@ -1618,6 +1622,7 @@ def update_account(account_id):
 
 
 @app.route('/api/accounts/<int:account_id>', methods=['DELETE'])
+@require_api_key
 def delete_account(account_id):
     """删除账号"""
     if account_id < 0 or account_id >= len(account_manager.accounts):
@@ -1640,6 +1645,7 @@ def delete_account(account_id):
 
 
 @app.route('/api/accounts/<int:account_id>/toggle', methods=['POST'])
+@require_api_key
 def toggle_account(account_id):
     """切换账号状态"""
     if account_id < 0 or account_id >= len(account_manager.accounts):
@@ -1660,6 +1666,7 @@ def toggle_account(account_id):
     return jsonify({"success": True, "available": not current})
 
 
+@require_api_key
 @app.route('/api/accounts/<int:account_id>/test', methods=['GET'])
 def test_account(account_id):
     """测试账号JWT获取"""
@@ -1676,6 +1683,7 @@ def test_account(account_id):
         return jsonify({"success": False, "message": str(e)})
 
 
+@require_api_key
 @app.route('/api/models', methods=['GET'])
 def get_models_config():
     """获取模型配置"""
@@ -1683,6 +1691,7 @@ def get_models_config():
     return jsonify({"models": models})
 
 
+@require_api_key
 @app.route('/api/models', methods=['POST'])
 def add_model():
     """添加模型"""
@@ -1706,6 +1715,7 @@ def add_model():
     return jsonify({"success": True})
 
 
+@require_api_key
 @app.route('/api/models/<model_id>', methods=['PUT'])
 def update_model(model_id):
     """更新模型"""
@@ -1730,6 +1740,7 @@ def update_model(model_id):
     return jsonify({"error": "模型不存在"}), 404
 
 
+@require_api_key
 @app.route('/api/models/<model_id>', methods=['DELETE'])
 def delete_model(model_id):
     """删除模型"""
@@ -1744,12 +1755,14 @@ def delete_model(model_id):
     return jsonify({"error": "模型不存在"}), 404
 
 
+@require_api_key
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """获取完整配置"""
     return jsonify(account_manager.config)
 
 
+@require_api_key
 @app.route('/api/config', methods=['PUT'])
 def update_config():
     """更新配置"""
@@ -1761,6 +1774,7 @@ def update_config():
     return jsonify({"success": True})
 
 
+@require_api_key
 @app.route('/api/config/import', methods=['POST'])
 def import_config():
     """导入配置"""
@@ -1785,6 +1799,7 @@ def import_config():
         return jsonify({"error": str(e)}), 400
 
 
+@require_api_key
 @app.route('/api/proxy/test', methods=['POST'])
 def test_proxy():
     """测试代理"""
@@ -1801,6 +1816,7 @@ def test_proxy():
     })
 
 
+@require_api_key
 @app.route('/api/proxy/status', methods=['GET'])
 def get_proxy_status():
     """获取代理状态"""
@@ -1817,6 +1833,7 @@ def get_proxy_status():
 
 
 @app.route('/api/config/export', methods=['GET'])
+@require_api_key
 def export_config():
     """导出配置"""
     return jsonify(account_manager.config)
