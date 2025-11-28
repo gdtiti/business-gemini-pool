@@ -53,7 +53,7 @@ RUN echo "Starting Python dependencies installation..." && \
 COPY --chown=appuser:appuser . .
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/image /app/logs && \
+RUN mkdir -p /app/image /app/logs  && \
     chown -R appuser:appuser /app && \
     chmod 755 /app
 

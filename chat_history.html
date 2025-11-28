@@ -159,6 +159,13 @@
             box-shadow: var(--shadow-sm);
             word-wrap: break-word;
             white-space: pre-wrap;
+            min-height: 20px; /* 确保即使内容为空也有最小高度 */
+            display: none; /* 默认隐藏，通过JavaScript控制显示 */
+        }
+
+        /* 只有当气泡有内容时才显示 */
+        .bubble:not(:empty) {
+            display: block;
         }
 
         .message-row.user .bubble {
@@ -520,6 +527,195 @@
             border-radius: 0 0 20px 20px;
             transition: width 0.3s;
         }
+
+        /* ==================== Markdown样式 ==================== */
+        .bubble .md-header {
+            margin: 16px 0 8px 0;
+            font-weight: 600;
+            color: var(--text-main);
+            line-height: 1.3;
+        }
+
+        .bubble .md-h1 { font-size: 1.5em; border-bottom: 2px solid var(--border); padding-bottom: 4px; }
+        .bubble .md-h2 { font-size: 1.3em; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+        .bubble .md-h3 { font-size: 1.1em; }
+        .bubble .md-h4 { font-size: 1.05em; }
+        .bubble .md-h5 { font-size: 1em; }
+        .bubble .md-h6 { font-size: 0.9em; color: var(--text-muted); }
+
+        .bubble .code-block {
+            margin: 12px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            background: var(--input-bg);
+        }
+
+        .bubble .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--hover-bg);
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .bubble .code-language {
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .bubble .code-copy-btn {
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--card-bg);
+            color: var(--text-main);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .bubble .code-copy-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .bubble .code-block pre {
+            margin: 0;
+            padding: 12px;
+            overflow-x: auto;
+            background: transparent;
+        }
+
+        .bubble .code-block code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            color: var(--text-main);
+        }
+
+        .bubble .inline-code {
+            background: var(--hover-bg);
+            color: var(--primary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            border: 1px solid var(--border);
+        }
+
+        .bubble strong {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .bubble em {
+            font-style: italic;
+            color: var(--text-main);
+        }
+
+        .bubble del {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .bubble .md-image-container {
+            margin: 12px 0;
+            text-align: center;
+        }
+
+        .bubble .md-image {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .bubble .md-image:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow-md);
+        }
+
+        .bubble .md-image-error {
+            padding: 16px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            background: var(--hover-bg);
+            color: var(--text-muted);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .bubble a {
+            color: var(--primary);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .bubble a:hover {
+            border-bottom-color: var(--primary);
+        }
+
+        .bubble .md-blockquote {
+            margin: 12px 0;
+            padding: 12px 16px;
+            border-left: 4px solid var(--primary);
+            background: var(--primary-light);
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+        }
+
+        .bubble .md-list, .bubble .md-ordered-list {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .bubble .md-list li, .bubble .md-ordered-list li {
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+
+        .bubble .md-ordered-list {
+            list-style-type: decimal;
+        }
+
+        .bubble .md-list {
+            list-style-type: disc;
+        }
+
+        .bubble p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .bubble p:first-child {
+            margin-top: 0;
+        }
+
+        .bubble p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* 深色主题适配 */
+        [data-theme="dark"] .bubble .code-header {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        [data-theme="dark"] .bubble .inline-code {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        [data-theme="dark"] .bubble .md-blockquote {
+            background: rgba(37, 99, 235, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -588,6 +784,7 @@
         let abortController = null;
         let uploadedFiles = []; // 存储已上传的文件信息 {id, name, gemini_file_id}
         let currentApiKey = localStorage.getItem('apiKey') || '';
+        let isConversationCleared = false; // 对话清除标志
 
         // ==================== API 认证功能 ====================
         function getApiHeaders() {
@@ -778,6 +975,14 @@
                 return;
             }
 
+            // 如果对话之前被清除过，现在重置标志，重新开始上下文
+            let forceNewSession = false;
+            if (isConversationCleared) {
+                isConversationCleared = false;
+                forceNewSession = true;
+                console.log('对话清除标志已重置，将强制创建新的AI会话');
+            }
+
             // 获取已上传的文件信息
             const attachments = uploadedFiles.map(f => ({
                 name: f.name,
@@ -797,9 +1002,9 @@
 
             try {
                 if (isStream) {
-                    await sendStreamRequest(text);
+                    await sendStreamRequest(text, forceNewSession);
                 } else {
-                    await sendNonStreamRequest(text);
+                    await sendNonStreamRequest(text, forceNewSession);
                 }
             } catch (error) {
                 console.error('请求失败:', error);
@@ -814,7 +1019,7 @@
         }
 
         // ==================== 流式请求 ====================
-        async function sendStreamRequest(text) {
+        async function sendStreamRequest(text, forceNewSession = false) {
             // 显示等待动画
             const typingId = showTypingIndicator();
             
@@ -824,13 +1029,20 @@
             abortController = new AbortController();
             console.log('开始发送流式请求...');
 
+            const requestBody = {
+                model: getSelectedModel(),
+                messages: buildMessages(text),
+                stream: true
+            };
+
+            // 如果需要强制创建新会话，添加参数
+            if (forceNewSession) {
+                requestBody.force_new_session = true;
+            }
+
             const response = await apiRequest('/v1/chat/completions', {
                 method: 'POST',
-                body: JSON.stringify({
-                    model: getSelectedModel(),
-                    messages: buildMessages(text),
-                    stream: true
-                }),
+                body: JSON.stringify(requestBody),
                 signal: abortController.signal
             });
 
@@ -888,19 +1100,26 @@
         }
 
         // ==================== 非流式请求 ====================
-        async function sendNonStreamRequest(text) {
+        async function sendNonStreamRequest(text, forceNewSession = false) {
             // 显示加载指示器
             const loadingId = showTypingIndicator();
 
             abortController = new AbortController();
 
+            const requestBody = {
+                model: getSelectedModel(),
+                messages: buildMessages(text),
+                stream: false
+            };
+
+            // 如果需要强制创建新会话，添加参数
+            if (forceNewSession) {
+                requestBody.force_new_session = true;
+            }
+
             const response = await apiRequest('/v1/chat/completions', {
                 method: 'POST',
-                body: JSON.stringify({
-                    model: getSelectedModel(),
-                    messages: buildMessages(text),
-                    stream: false
-                }),
+                body: JSON.stringify(requestBody),
                 signal: abortController.signal
             });
 
@@ -925,14 +1144,17 @@
         // ==================== 构建消息列表 ====================
         function buildMessages(currentText) {
             const messages = [];
-            
-            // 添加历史消息（最近10条）
-            const recentHistory = chatHistory.slice(-10);
-            for (const msg of recentHistory) {
-                messages.push({
-                    role: msg.role === 'ai' ? 'assistant' : 'user',
-                    content: msg.content
-                });
+
+            // 如果对话已被清除，不包含历史消息，重新开始对话
+            if (!isConversationCleared) {
+                // 添加历史消息（最近10条）
+                const recentHistory = chatHistory.slice(-10);
+                for (const msg of recentHistory) {
+                    messages.push({
+                        role: msg.role === 'ai' ? 'assistant' : 'user',
+                        content: msg.content
+                    });
+                }
             }
 
             // 构建当前用户消息（支持文件）
@@ -1014,7 +1236,12 @@
             
             const bubbleDiv = document.createElement('div');
             bubbleDiv.className = 'bubble';
-            bubbleDiv.textContent = content;
+            // AI消息需要解析图片URL和Markdown
+            if (role === 'ai') {
+                bubbleDiv.innerHTML = parseContentWithImages(content);
+            } else {
+                bubbleDiv.textContent = content;
+            }
             
             const timeDiv = document.createElement('div');
             timeDiv.className = 'timestamp';
@@ -1074,20 +1301,254 @@
         function updateAIBubble(messageId, content) {
             const bubble = document.getElementById(messageId + '-bubble');
             if (bubble) {
+                console.log('updateAIBubble 输入内容:', content); // 调试日志
+
+                // 强制清理和修复HTML内容
+                let cleanContent = content;
+
+                // 如果内容包含截断的HTML标签，尝试修复
+                if (content.includes('onclick="window.open') && !content.includes('>')) {
+                    cleanContent = content + '>';
+                    console.log('修复截断的HTML:', cleanContent); // 调试日志
+                }
+
+                // 如果内容包含HTML属性但没有完整的标签，清理HTML
+                if (content.includes('onclick="window.open') || content.includes('onerror=')) {
+                    // 查找完整的markdown图片模式
+                    const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+                    cleanContent = cleanContent.replace(markdownImageRegex, (match, alt, src) => {
+                        return `![${alt}](${src})`;
+                    });
+                    console.log('清理后的内容:', cleanContent); // 调试日志
+                }
+
                 // 解析内容，将图片URL转换为图片元素
-                bubble.innerHTML = parseContentWithImages(content);
+                const processedContent = parseContentWithImages(cleanContent);
+                console.log('处理后内容长度:', processedContent?.length || 0); // 调试日志
+                console.log('处理后内容前100字符:', processedContent?.substring(0, 100) || 'empty'); // 调试日志
+
+                bubble.innerHTML = processedContent;
                 const container = document.getElementById('chatContainer');
                 container.scrollTop = container.scrollHeight;
             }
         }
 
-        // 解析内容中的图片URL并转换为HTML
+        // ==================== Markdown渲染器 ====================
+        class SimpleMarkdownRenderer {
+            constructor() {
+                this.rules = [
+                    { type: 'inline_code', regex: /`([^`]+)`/g, replacement: '<code class="inline-code">$1</code>' },
+                    { type: 'bold', regex: /\*\*([^*]+)\*\*/g, replacement: '<strong>$1</strong>' },
+                    { type: 'italic', regex: /\*([^*]+)\*/g, replacement: '<em>$1</em>' },
+                    { type: 'strikethrough', regex: /~~([^~]+)~~/g, replacement: '<del>$1</del>' },
+                    { type: 'image', regex: /!\[([^\]]*)\]\(([^)]+)\)/g, replacement: this.renderImage.bind(this) },
+                    { type: 'link', regex: /\[([^\]]+)\]\(([^)]+)\)/g, replacement: '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>' },
+                    { type: 'blockquote', regex: /^>\s+(.+)$/gm, replacement: this.renderBlockquote.bind(this) },
+                    { type: 'list_item', regex: /^[-*+]\s+(.+)$/gm, replacement: '<li>$1</li>' },
+                    { type: 'ordered_list', regex: /^\d+\.\s+(.+)$/gm, replacement: '<li>$1</li>' },
+                    { type: 'header', regex: /^(#{1,6})\s+(.+)$/gm, replacement: this.renderHeader.bind(this) },
+                    { type: 'line_break', regex: /\n\n/g, replacement: '</p><p>' },
+                    { type: 'single_line_break', regex: /\n/g, replacement: '<br>' }
+                ];
+            }
+
+            render(text) {
+                if (!text) return '';
+
+                let html = escapeHtml(text);
+
+                // 先处理代码块，避免被其他规则干扰
+                html = this.renderCodeBlocks(html);
+
+                // 处理其他规则
+                for (const rule of this.rules) {
+                    if (rule.type !== 'code_block') {
+                        html = html.replace(rule.regex, rule.replacement);
+                    }
+                }
+
+                // 处理列表
+                html = this.renderLists(html);
+
+                // 段落包装 - 检查是否有实际内容（不只是HTML标签）
+                const textOnly = html.replace(/<[^>]*>/g, '').trim();
+                if (textOnly) {
+                    html = '<p>' + html + '</p>';
+                } else if (html.trim()) {
+                    // 如果只有HTML标签（如图片），直接返回HTML
+                    return html;
+                }
+
+                return html;
+            }
+
+            renderCodeBlocks(text) {
+                const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+                return text.replace(codeBlockRegex, (match, language, code) => {
+                    const lang = language || 'text';
+                    return `<div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">${lang}</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">复制</button>
+                        </div>
+                        <pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>
+                    </div>`;
+                });
+            }
+
+            renderHeader(match, hashes, content) {
+                const level = hashes.length;
+                return `<h${level} class="md-header md-h${level}">${content}</h${level}>`;
+            }
+
+            renderImage(match, alt, src) {
+                // 检查是否是相对路径的图片，转换为绝对路径
+                const absoluteSrc = src.startsWith('http') ? src : `${window.location.origin}/${src}`;
+                return `<div class="md-image-container">
+                    <img src="${absoluteSrc}" alt="${alt}" class="md-image"
+                         onclick="window.open('${absoluteSrc}', '_blank')"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="md-image-error" style="display:none;">
+                        🖼️ <span>${alt || '图片'}</span><br>
+                        <small>图片加载失败: ${escapeHtml(src)}</small>
+                    </div>
+                </div>`;
+            }
+
+            renderBlockquote(match, content) {
+                return `<blockquote class="md-blockquote">${content}</blockquote>`;
+            }
+
+            renderLists(text) {
+                // 处理无序列表
+                text = text.replace(/(<li>.*?<\/li>)/gs, (match) => {
+                    if (match.includes('- ') || match.includes('* ') || match.includes('+ ')) {
+                        return '<ul class="md-list">' + match + '</ul>';
+                    }
+                    return match;
+                });
+
+                // 处理有序列表
+                text = text.replace(/(<li>.*?<\/li>)/gs, (match) => {
+                    if (/\d+\./.test(match)) {
+                        return '<ol class="md-ordered-list">' + match + '</ol>';
+                    }
+                    return match;
+                });
+
+                return text;
+            }
+        }
+
+        // 立即初始化markdownRenderer，确保在其他函数使用前已准备好
+        const markdownRenderer = new SimpleMarkdownRenderer();
+
+        // 解析内容中的图片URL并转换为HTML（兼容旧版本）
         function parseContentWithImages(content) {
-            // 匹配图片URL的正则表达式（支持常见图片格式）
+            console.log('parseContentWithImages 输入内容长度:', content?.length || 0);
+            console.log('parseContentWithImages 输入内容前100字符:', content?.substring(0, 100) || 'empty');
+
+            if (!content) return '';
+
+            let processedContent = content;
+
+            // 首先处理包含HTML属性但格式错误的图片
+            // 修复截断的HTML标签
+            if (content.includes('onclick="window.open') && !content.includes('>')) {
+                processedContent = content + '>';
+                console.log('修复截断的HTML标签:', processedContent);
+            }
+
+            // 清理包含HTML属性但不完整的内容，重新构建为正确的markdown
+            if (processedContent.includes('onclick="window.open') || processedContent.includes('onerror=')) {
+                console.log('检测到HTML属性，尝试修复...');
+
+                // 提取图片URL
+                const urlMatch = processedContent.match(/window\.open\('([^']+)'/);
+                if (urlMatch) {
+                    const imageUrl = urlMatch[1];
+                    // 查找可能的alt文本
+                    const altMatch = processedContent.match(/!\[([^\]]*)\]/) || ['!', '图片'];
+                    const altText = altMatch[1];
+
+                    // 重新构建为正确的markdown
+                    processedContent = `![${altText}](${imageUrl})`;
+                    console.log('修复后的内容:', processedContent);
+                }
+            }
+
+            // 预处理：先处理markdown图片格式，确保正确转换为HTML
+            const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+            processedContent = processedContent.replace(markdownImageRegex, (match, alt, src) => {
+                console.log('找到markdown图片:', { match, alt, src });
+
+                // 清理URL，移除可能的HTML属性
+                let cleanSrc = src;
+                if (src.includes('" onclick="') || src.includes('" onerror="')) {
+                    cleanSrc = src.split('"')[0]; // 只取引号前的部分
+                    console.log('清理后的URL:', cleanSrc);
+                }
+
+                // 检查是否是本地图片路径
+                if (cleanSrc.includes('image/') || cleanSrc.startsWith('image/') || (!cleanSrc.startsWith('http') && !cleanSrc.includes('/'))) {
+                    // 处理相对路径图片
+                    const fullUrl = cleanSrc.startsWith('http') ? cleanSrc : `${window.location.origin}/${cleanSrc.startsWith('image/') ? '' : 'image/'}${cleanSrc}`;
+                    console.log('转换为完整URL:', fullUrl);
+
+                    const imageHtml = `<div class="md-image-container">
+                        <img src="${fullUrl}" alt="${alt || '图片'}" class="md-image"
+                             onclick="window.open('${fullUrl}', '_blank')"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="md-image-error" style="display:none;">
+                            🖼️ <span>${alt || '图片'}</span><br>
+                            <small>图片加载失败: ${cleanSrc}</small>
+                        </div>
+                    </div>`;
+
+                    console.log('生成的图片HTML:', imageHtml);
+                    return imageHtml;
+                }
+                return match; // 保持原样
+            });
+
+            // 检查是否有图片被处理
+            if (processedContent !== content) {
+                console.log('图片处理完成，最终内容:', processedContent);
+                return processedContent;
+            }
+
+            // 如果没有图片，处理其他markdown格式
+            if (processedContent.includes('```') || processedContent.includes('**') || processedContent.includes('*') ||
+                processedContent.includes('[') || processedContent.includes('> ') ||
+                processedContent.includes('# ')) {
+                console.log('使用markdown渲染器处理非图片内容');
+                try {
+                    const result = markdownRenderer.render(processedContent);
+                    console.log('markdown渲染结果长度:', result?.length || 0);
+                    console.log('markdown渲染结果前100字符:', result?.substring(0, 100) || 'empty');
+
+                    // 后处理：确保markdown渲染器生成的图片标签正确
+                    const finalResult = result.replace(/<img[^>]*src="([^"]*)"[^>]*>/g, (match, src) => {
+                        if (src.includes('image/') || (!src.startsWith('http') && !src.includes('//'))) {
+                            const fullUrl = src.startsWith('http') ? src : `${window.location.origin}/${src.startsWith('image/') ? '' : 'image/'}${src}`;
+                            return match.replace(src, fullUrl);
+                        }
+                        return match;
+                    });
+
+                    return finalResult;
+                } catch (error) {
+                    console.error('markdown渲染出错:', error);
+                    return escapeHtml(processedContent);
+                }
+            }
+
+            // 兼容旧版本的纯图片URL处理
             const imageUrlRegex = /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|bmp|svg))/gi;
-            
+
             // 将内容按行分割处理
-            const lines = content.split('\n');
+            const lines = processedContent.split('\n');
             const processedLines = lines.map(line => {
                 // 检查该行是否是纯图片URL
                 const trimmedLine = line.trim();
@@ -1095,14 +1556,14 @@
                     // 重置正则表达式的lastIndex
                     imageUrlRegex.lastIndex = 0;
                     // 该行是纯图片URL，转换为图片元素
-                    return `<div class="ai-image-container"><img src="${escapeHtml(trimmedLine)}" alt="AI生成的图片" style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer; margin: 8px 0;" onclick="window.open('${escapeHtml(trimmedLine)}', '_blank')" onerror="this.style.display='none'; this.nextSibling.style.display='inline';"><span style="display:none;">${escapeHtml(trimmedLine)}</span></div>`;
+                    return `<div class="ai-image-container"><img src="${escapeHtml(trimmedLine)}" alt="AI生成的图片" style="max-width: 300px; max-height: 300px; border-radius: 8px; cursor: pointer; margin: 8px 0;" onclick="window.open('${escapeHtml(trimmedLine)}', '_blank')" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><span style="display:none;">${escapeHtml(trimmedLine)}</span></div>`;
                 }
                 // 重置正则表达式的lastIndex
                 imageUrlRegex.lastIndex = 0;
                 // 普通文本行，转义HTML
                 return escapeHtml(line);
             });
-            
+
             return processedLines.join('<br>');
         }
 
@@ -1111,6 +1572,87 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // 代码复制功能
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block');
+            const code = codeBlock.querySelector('code');
+
+            if (code) {
+                const text = code.textContent;
+
+                // 使用现代的 Clipboard API
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showCopySuccess(button);
+                    }).catch(err => {
+                        // 如果失败，回退到传统方法
+                        fallbackCopyCode(text, button);
+                    });
+                } else {
+                    // 回退到传统复制方法
+                    fallbackCopyCode(text, button);
+                }
+            }
+        }
+
+        // 回退的代码复制方法
+        function fallbackCopyCode(text, button) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            textArea.style.pointerEvents = 'none';
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(button);
+                } else {
+                    showCopyError(button);
+                }
+            } catch (err) {
+                showCopyError(button);
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        }
+
+        // 显示复制成功提示
+        function showCopySuccess(button) {
+            const originalText = button.textContent;
+            button.textContent = '已复制';
+            button.style.background = 'var(--success)';
+            button.style.color = 'white';
+            button.style.borderColor = 'var(--success)';
+
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = 'var(--card-bg)';
+                button.style.color = 'var(--text-main)';
+                button.style.borderColor = 'var(--border)';
+            }, 2000);
+        }
+
+        // 显示复制错误提示
+        function showCopyError(button) {
+            const originalText = button.textContent;
+            button.textContent = '复制失败';
+            button.style.background = 'var(--danger)';
+            button.style.color = 'white';
+            button.style.borderColor = 'var(--danger)';
+
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = 'var(--card-bg)';
+                button.style.color = 'var(--text-main)';
+                button.style.borderColor = 'var(--border)';
+            }, 2000);
         }
 
         function showTypingIndicator() {
@@ -1276,12 +1818,67 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function clearChat() {
+        async function clearChat() {
             if (confirm('确定要清空所有对话记录吗？')) {
+                try {
+                    // 调用后端API重置所有Gemini会话
+                    const response = await fetch('/v1/sessions/reset', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${currentApiKey}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        console.error('Session reset failed:', response.status);
+                        // 即使会话重置失败，也继续清空前端历史
+                    }
+
+                    const result = response.ok ? await response.json() : null;
+                    if (result && result.message) {
+                        console.log('Session reset:', result.message);
+                    }
+                } catch (error) {
+                    console.error('Error calling session reset API:', error);
+                    // 即使API调用失败，也继续清空前端历史
+                }
+
+                // 清空前端历史记录
                 chatHistory = [];
+                isConversationCleared = true; // 设置对话清除标志
                 localStorage.removeItem('Business Gemini_chat_history');
                 document.getElementById('chatContainer').innerHTML = '';
-                addMessage('ai', '对话已清空。有什么我可以帮你的吗？');
+
+                // 直接添加清空完成的提示，不保存到历史记录
+                const container = document.getElementById('chatContainer');
+                const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'message-row ai';
+
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'avatar ai';
+                avatarDiv.innerHTML = '🤖';
+
+                const contentWrapper = document.createElement('div');
+                contentWrapper.className = 'message-content';
+
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.className = 'bubble';
+                bubbleDiv.textContent = '对话已清空，AI会话已重置。有什么我可以帮你的吗？';
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'timestamp';
+                timeDiv.innerText = time;
+
+                contentWrapper.appendChild(bubbleDiv);
+                contentWrapper.appendChild(timeDiv);
+
+                rowDiv.appendChild(avatarDiv);
+                rowDiv.appendChild(contentWrapper);
+
+                container.appendChild(rowDiv);
             }
         }
 

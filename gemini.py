@@ -15,6 +15,8 @@ import os
 import re
 import mimetypes
 import requests
+import logging
+import logging.handlers
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -26,13 +28,109 @@ from flask_cors import CORS
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# 尝试加载.env文件（如果存在）
+try:
+    from dotenv import load_dotenv
+
+    # 尝试从多个位置加载.env文件
+    env_files = [
+        '.env',  # 当前目录
+        '.env.local',  # 本地覆盖配置
+        '.env.production',  # 生产环境配置
+    ]
+
+    for env_file in env_files:
+        if os.path.exists(env_file):
+            print(f"加载环境变量文件: {env_file}")
+            load_dotenv(env_file, override=False)
+            break
+    else:
+        print("未找到.env文件，使用系统环境变量")
+
+except ImportError:
+    print("未安装python-dotenv，跳过.env文件加载。请运行: pip install python-dotenv")
+except Exception as e:
+    print(f"加载.env文件时出错: {e}")
+
 # 配置
 # CONFIG_FILE = Path(__file__).parent / "business_gemini_session.json"  # 已弃用，使用环境变量
 
 # 图片缓存配置
 IMAGE_CACHE_DIR = Path(__file__).parent / "image"
-IMAGE_CACHE_HOURS = 1  # 图片缓存时间（小时）
+IMAGE_CACHE_HOURS = 24  # 图片缓存时间（小时）
 IMAGE_CACHE_DIR.mkdir(exist_ok=True)
+
+# ==================== 日志系统配置 ====================
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+# 日志配置
+def setup_logging():
+    """配置日志系统"""
+    # 从环境变量获取日志级别
+    log_level_str = os.getenv('LOG_LEVEL', 'INFO').upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # 是否启用文件日志
+    enable_file_logging = os.getenv('ENABLE_FILE_LOGGING', 'false').lower() == 'true'
+
+    # 创建根日志器
+    logger = logging.getLogger('gemini_pool')
+    logger.setLevel(log_level)
+
+    # 清除现有处理器
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+
+    # 控制台格式
+    console_formatter = logging.Formatter(
+        '[%(asctime)s] %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+
+    # 文件处理器
+    if enable_file_logging:
+        # 按日期轮转的文件处理器
+        file_handler = logging.handlers.TimedRotatingFileHandler(
+            filename=LOGS_DIR / 'gemini_pool.log',
+            when='midnight',  # 每天午夜轮转
+            interval=1,
+            backupCount=30,  # 保留30天的日志
+            encoding='utf-8'
+        )
+        file_handler.setLevel(logging.DEBUG)
+
+        # 文件格式 - 包含更详细的信息
+        file_formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s - %(name)s - %(filename)s:%(lineno)d - %(funcName)s() - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+
+        print(f"[日志系统] 文件日志已启用，日志文件: {LOGS_DIR / 'gemini_pool.log'}")
+
+    # 为不同模块创建子日志器
+    api_logger = logging.getLogger('gemini_pool.api')
+    jwt_logger = logging.getLogger('gemini_pool.jwt')
+    chat_logger = logging.getLogger('gemini_pool.chat')
+    image_logger = logging.getLogger('gemini_pool.image')
+
+    # 设置子日志器级别和传播
+    for sub_logger in [api_logger, jwt_logger, chat_logger, image_logger]:
+        sub_logger.setLevel(log_level)
+        sub_logger.propagate = True
+
+    return logger
+
+# 初始化日志系统
+gemini_logger = setup_logging()
 
 # API endpoints
 BASE_URL = "https://biz-discoveryengine.googleapis.com/v1alpha/locations/global"
@@ -108,19 +206,39 @@ def load_config_from_env() -> dict:
     accounts_json = os.getenv("ACCOUNTS_CONFIG", "[]")
     try:
         if accounts_json and accounts_json.strip():
+            # 处理环境变量中的引号问题
+            accounts_json = accounts_json.strip()
+            # 如果字符串被单引号包围，去掉单引号
+            if accounts_json.startswith("'") and accounts_json.endswith("'"):
+                accounts_json = accounts_json[1:-1]
+            # 如果字符串被双引号包围，去掉双引号
+            elif accounts_json.startswith('"') and accounts_json.endswith('"'):
+                accounts_json = accounts_json[1:-1]
+
             config["accounts"] = json.loads(accounts_json)
             print(f"[配置] 从ACCOUNTS_CONFIG加载了 {len(config['accounts'])} 个账号")
     except (json.JSONDecodeError, Exception) as e:
         print(f"[!] ACCOUNTS_CONFIG JSON解析错误: {e}")
+        print(f"[!] 原始值: {accounts_json}")
 
     # 从JSON格式加载模型配置
     models_json = os.getenv("MODELS_CONFIG", "[]")
     try:
         if models_json and models_json.strip():
+            # 处理环境变量中的引号问题
+            models_json = models_json.strip()
+            # 如果字符串被单引号包围，去掉单引号
+            if models_json.startswith("'") and models_json.endswith("'"):
+                models_json = models_json[1:-1]
+            # 如果字符串被双引号包围，去掉双引号
+            elif models_json.startswith('"') and models_json.endswith('"'):
+                models_json = models_json[1:-1]
+
             config["models"] = json.loads(models_json)
             print(f"[配置] 从MODELS_CONFIG加载了 {len(config['models'])} 个模型")
     except (json.JSONDecodeError, Exception) as e:
         print(f"[!] MODELS_CONFIG JSON解析错误: {e}")
+        print(f"[!] 原始值: {models_json}")
 
     # 如果没有JSON配置，尝试单个账号配置
     if not config["accounts"]:
@@ -391,10 +509,16 @@ def get_jwt_for_account(account: dict, proxy: str) -> str:
 
     # 处理Google安全前缀
     text = resp.text
-    if text.startswith(")]}'\n") or text.startswith(")]}'"): 
+    if text.startswith(")]}'\n") or text.startswith(")]}'"):
         text = text[4:].strip()
 
     data = json.loads(text)
+    if "keyId" not in data or "xsrfToken" not in data:
+        error_msg = f"账号 {csesidx} 认证失败，响应: {data}"
+        if "message" in data:
+            error_msg += f" - {data['message']}"
+        raise ValueError(error_msg)
+
     key_id = data["keyId"]
     print(f"账号: {account.get('csesidx')} 账号可用! key_id: {key_id}")
     xsrf_token = data["xsrfToken"]
@@ -421,28 +545,21 @@ def get_headers(jwt: str) -> dict:
 
 def ensure_jwt_for_account(account_idx: int, account: dict):
     """确保指定账号的JWT有效，必要时刷新"""
-    print(f"[DEBUG][ensure_jwt_for_account] 开始 - 账号索引: {account_idx}, CSESIDX: {account.get('csesidx')}")
-    start_time = time.time()
     with account_manager.lock:
         state = account_manager.account_states[account_idx]
         jwt_age = time.time() - state["jwt_time"] if state["jwt"] else float('inf')
-        print(f"[DEBUG][ensure_jwt_for_account] JWT状态 - 存在: {state['jwt'] is not None}, 年龄: {jwt_age:.2f}秒")
+
         if state["jwt"] is None or jwt_age > 240:
-            print(f"[DEBUG][ensure_jwt_for_account] 需要刷新JWT...")
             proxy = account_manager.config.get("proxy")
             try:
-                refresh_start = time.time()
                 state["jwt"] = get_jwt_for_account(account, proxy)
                 state["jwt_time"] = time.time()
-                print(f"[DEBUG][ensure_jwt_for_account] JWT刷新成功 - 耗时: {time.time() - refresh_start:.2f}秒")
             except Exception as e:
-                print(f"[DEBUG][ensure_jwt_for_account] JWT刷新失败: {e}")
+                print(f"JWT刷新失败: {e}")
                 # JWT获取失败，标记账号不可用
                 account_manager.mark_account_unavailable(account_idx, str(e))
                 raise
-        else:
-            print(f"[DEBUG][ensure_jwt_for_account] 使用缓存JWT")
-        print(f"[DEBUG][ensure_jwt_for_account] 完成 - 总耗时: {time.time() - start_time:.2f}秒")
+
         return state["jwt"]
 
 
@@ -487,19 +604,24 @@ def create_chat_session(jwt: str, team_id: str, proxy: str) -> str:
     return session_name
 
 
-def ensure_session_for_account(account_idx: int, account: dict):
+def ensure_session_for_account(account_idx: int, account: dict, force_new_session: bool = False):
     """确保指定账号的会话有效"""
-    print(f"[DEBUG][ensure_session_for_account] 开始 - 账号索引: {account_idx}")
+    print(f"[DEBUG][ensure_session_for_account] 开始 - 账号索引: {account_idx}, 强制新session: {force_new_session}")
     start_time = time.time()
-    
+
     jwt_start = time.time()
     jwt = ensure_jwt_for_account(account_idx, account)
     print(f"[DEBUG][ensure_session_for_account] JWT获取完成 - 耗时: {time.time() - jwt_start:.2f}秒")
-    
+
     with account_manager.lock:
         state = account_manager.account_states[account_idx]
         print(f"[DEBUG][ensure_session_for_account] 当前session状态: {state['session'] is not None}")
-        if state["session"] is None:
+
+        # 如果强制创建新session或者session不存在，则创建新session
+        if state["session"] is None or force_new_session:
+            if force_new_session and state["session"] is not None:
+                print(f"[DEBUG][ensure_session_for_account] 强制清除现有session: {state['session']}")
+
             print(f"[DEBUG][ensure_session_for_account] 需要创建新session...")
             proxy = account_manager.config.get("proxy")
             team_id = account.get("team_id")
@@ -508,9 +630,28 @@ def ensure_session_for_account(account_idx: int, account: dict):
             print(f"[DEBUG][ensure_session_for_account] Session创建完成 - 耗时: {time.time() - session_start:.2f}秒")
         else:
             print(f"[DEBUG][ensure_session_for_account] 使用缓存session: {state['session']}")
-        
+
         print(f"[DEBUG][ensure_session_for_account] 完成 - 总耗时: {time.time() - start_time:.2f}秒")
         return state["session"], jwt, account.get("team_id")
+
+
+def reset_all_sessions():
+    """重置所有账号的会话，强制创建新的session"""
+    print(f"[DEBUG][reset_all_sessions] 开始重置所有会话...")
+
+    with account_manager.lock:
+        total_accounts = len(account_manager.accounts)
+        print(f"[DEBUG][reset_all_sessions] 总账号数: {total_accounts}")
+
+        for account_idx in range(total_accounts):
+            state = account_manager.account_states.get(account_idx, {})
+            if state.get("session"):
+                print(f"[DEBUG][reset_all_sessions] 清除账号 {account_idx} 的session: {state['session']}")
+                state["session"] = None
+            else:
+                print(f"[DEBUG][reset_all_sessions] 账号 {account_idx} 没有session需要清除")
+
+    print(f"[DEBUG][reset_all_sessions] 所有会话已重置完成")
 
 
 # ==================== 文件上传功能 ====================
@@ -624,9 +765,12 @@ def cleanup_expired_images():
 
 
 def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filename: Optional[str] = None) -> str:
-    """保存图片到缓存目录，返回文件名"""
+    """保存图片到缓存目录，返回文件名
+
+    注意：在HuggingFace Space等无状态环境中，图片文件可能无法持久化存储
+    """
     IMAGE_CACHE_DIR.mkdir(exist_ok=True)
-    
+
     # 确定文件扩展名
     ext_map = {
         "image/png": ".png",
@@ -635,7 +779,7 @@ def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filenam
         "image/webp": ".webp",
     }
     ext = ext_map.get(mime_type, ".png")
-    
+
     if filename:
         # 确保有正确的扩展名
         if not any(filename.endswith(e) for e in ext_map.values()):
@@ -643,12 +787,18 @@ def save_image_to_cache(image_data: bytes, mime_type: str = "image/png", filenam
     else:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"gemini_{timestamp}_{uuid.uuid4().hex[:8]}{ext}"
-    
-    filepath = IMAGE_CACHE_DIR / filename
-    with open(filepath, "wb") as f:
-        f.write(image_data)
-    
-    return filename
+
+    try:
+        filepath = IMAGE_CACHE_DIR / filename
+        with open(filepath, "wb") as f:
+            f.write(image_data)
+
+        print(f"[图片缓存] 保存成功: {filename} ({len(image_data)} bytes)")
+        return filename
+    except Exception as e:
+        print(f"[图片缓存] 保存失败: {filename}, 错误: {e}")
+        # 在无状态环境中，即使保存失败也返回文件名，让前端显示错误信息
+        return filename
 
 
 def parse_base64_data_url(data_url: str) -> Optional[Dict]:
@@ -1276,14 +1426,28 @@ def delete_file(file_id):
 @require_api_key
 def chat_completions():
     """聊天对话接口（支持图片输入输出）"""
+    api_logger = logging.getLogger('gemini_pool.api')
+    chat_logger = logging.getLogger('gemini_pool.chat')
+
+    start_time = time.time()
+    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+
     try:
-        # 每次请求时清理过期图片
-        cleanup_expired_images()
-        
         data = request.json
         messages = data.get('messages', [])
         prompts = data.get('prompts', [])  # 支持替代格式
         stream = data.get('stream', False)
+        model = data.get('model', 'unknown')
+        force_new_session = data.get('force_new_session', False)  # 强制创建新session
+
+        chat_logger.info(f"聊天请求开始 - IP: {client_ip}, 用户代理: {user_agent}")
+        chat_logger.debug(f"请求参数: 模型={model}, 流式={stream}, 消息数量={len(messages)}")
+
+        # 每次请求时清理过期图片
+        cleanup_expired_images()
+
+        chat_logger.debug(f"请求数据解析完成: messages={len(messages)}, prompts={len(prompts)}, 强制新session={force_new_session}")
 
         # 提取用户消息、图片和文件ID
         user_message = ""
@@ -1337,40 +1501,59 @@ def chat_completions():
             gemini_fid = file_manager.get_gemini_file_id(fid)
             if gemini_fid:
                 gemini_file_ids.append(gemini_fid)
-        
+
+        chat_logger.info(f"消息处理完成: 文本长度={len(user_message)}, 图片数量={len(input_images)}, 文件数量={len(gemini_file_ids)}")
+
         if not user_message and not input_images and not gemini_file_ids:
+            chat_logger.warning("请求中未找到有效的用户消息、图片或文件")
             return jsonify({"error": "No user message found"}), 400
-        
+
         # 轮训获取账号
         max_retries = len(account_manager.accounts)
         last_error = None
         chat_response = None
+
+        total_accounts, available_accounts = account_manager.get_account_count()
+        chat_logger.info(f"开始账号轮询: 总账号数={total_accounts}, 可用账号数={available_accounts}, 最大重试={max_retries}")
         
-        for _ in range(max_retries):
+        for retry in range(max_retries):
             try:
                 account_idx, account = account_manager.get_next_account()
-                session, jwt, team_id = ensure_session_for_account(account_idx, account)
+                chat_logger.info(f"尝试账号 {account_idx+1}/{max_retries} (第{retry+1}次重试)")
+
+                session, jwt, team_id = ensure_session_for_account(account_idx, account, force_new_session)
                 proxy = account_manager.config.get("proxy")
                 
                 # 上传内联图片获取 fileId
-                for img in input_images:
+                uploaded_count = 0
+                for i, img in enumerate(input_images):
+                    chat_logger.debug(f"上传第 {i+1}/{len(input_images)} 张图片")
                     uploaded_file_id = upload_inline_image_to_gemini(jwt, session, team_id, img, proxy)
                     if uploaded_file_id:
                         gemini_file_ids.append(uploaded_file_id)
-                
+                        uploaded_count += 1
+
+                chat_logger.info(f"图片上传完成: {uploaded_count}/{len(input_images)} 张图片成功上传")
+                chat_logger.debug(f"开始发送聊天请求，文件总数: {len(gemini_file_ids)}")
+
                 chat_response = stream_chat_with_images(jwt, session, user_message, proxy, team_id, gemini_file_ids)
+                chat_logger.info(f"账号 {account_idx+1} 请求成功")
                 break
             except Exception as e:
                 last_error = e
+                chat_logger.warning(f"账号 {account_idx+1} 请求失败: {str(e)}")
                 continue
         else:
             # 所有账号都失败
+            chat_logger.error(f"所有账号都失败，最后错误: {str(last_error)}")
             return jsonify({"error": f"所有账号请求失败: {last_error}"}), 500
 
         # 构建响应内容（包含图片）
         response_content = build_openai_response_content(chat_response, request.host_url)
+        chat_logger.info(f"响应内容构建完成，响应长度: {len(response_content)} 字符")
 
         if stream:
+            chat_logger.info("返回流式响应")
             # 流式响应
             def generate():
                 chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
@@ -1404,6 +1587,7 @@ def chat_completions():
 
             return Response(generate(), mimetype='text/event-stream')
         else:
+            chat_logger.info("返回非流式响应")
             # 非流式响应
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
@@ -1424,9 +1608,15 @@ def chat_completions():
                     "total_tokens": len(user_message) + len(chat_response.text)
                 }
             }
+            end_time = time.time()
+            request_duration = end_time - start_time
+            chat_logger.info(f"聊天请求完成，总耗时: {request_duration:.2f}秒")
             return jsonify(response)
 
     except Exception as e:
+        end_time = time.time()
+        request_duration = end_time - start_time
+        chat_logger.error(f"聊天请求异常，耗时: {request_duration:.2f}秒，错误: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
@@ -1484,12 +1674,22 @@ def serve_image(filename):
     """提供缓存图片的访问"""
     # 安全检查：防止路径遍历
     if '..' in filename or filename.startswith('/'):
+        print(f"[图片服务] 路径安全问题: {filename}")
         abort(404)
-    
+
     filepath = IMAGE_CACHE_DIR / filename
     if not filepath.exists():
+        print(f"[图片服务] 文件不存在: {filename}")
+        print(f"[图片服务] 查找路径: {filepath}")
+        try:
+            dir_contents = list(IMAGE_CACHE_DIR.iterdir())
+            print(f"[图片服务] 缓存目录内容: {dir_contents}")
+        except Exception as e:
+            print(f"[图片服务] 无法读取缓存目录: {e}")
         abort(404)
-    
+
+    print(f"[图片服务] 提供图片: {filename}")
+
     # 确定Content-Type
     ext = filepath.suffix.lower()
     mime_types = {
@@ -1500,7 +1700,7 @@ def serve_image(filename):
         '.webp': 'image/webp',
     }
     mime_type = mime_types.get(ext, 'application/octet-stream')
-    
+
     return send_from_directory(IMAGE_CACHE_DIR, filename, mimetype=mime_type)
 
 
@@ -1508,6 +1708,62 @@ def serve_image(filename):
 def health_check():
     """健康检查"""
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
+
+
+@require_api_key
+@app.route('/v1/sessions/reset', methods=['POST'])
+def reset_sessions():
+    """重置所有会话，���除对话记忆"""
+    try:
+        reset_all_sessions()
+        return jsonify({
+            "success": True,
+            "message": "所有会话已重置，对话记忆已清除"
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@app.route('/image/diagnose', methods=['GET'])
+def diagnose_image_service():
+    """图片服务诊断端点"""
+    try:
+        # 检查缓存目录
+        dir_exists = IMAGE_CACHE_DIR.exists()
+        dir_writable = os.access(IMAGE_CACHE_DIR, os.W_OK) if dir_exists else False
+
+        # 列出缓存目录内容
+        cache_files = []
+        if dir_exists:
+            try:
+                cache_files = list(IMAGE_CACHE_DIR.iterdir())
+            except Exception as e:
+                cache_files = [f"Error reading directory: {e}"]
+
+        return jsonify({
+            "timestamp": datetime.now().isoformat(),
+            "cache_directory": {
+                "path": str(IMAGE_CACHE_DIR),
+                "exists": dir_exists,
+                "writable": dir_writable,
+                "file_count": len([f for f in cache_files if isinstance(f, Path) and f.is_file()]),
+                "files": [f.name for f in cache_files if isinstance(f, Path)] if isinstance(cache_files, list) and isinstance(cache_files[0], Path) else cache_files
+            },
+            "cache_settings": {
+                "cache_hours": IMAGE_CACHE_HOURS,
+                "image_base_url": account_manager.config.get("image_base_url") if account_manager and hasattr(account_manager, 'config') else "NOT_SET"
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "error": f"诊断失败: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 
 @app.route('/api/public/status', methods=['GET'])
@@ -1521,6 +1777,8 @@ def public_status():
         "require_auth": require_auth,
         "version": "Business Gemini Pool v1.0"
     })
+
+
 
 
 @app.route('/api/status', methods=['GET'])
@@ -1866,6 +2124,19 @@ def print_startup_info():
     print("  类型: 环境变量配置")
     print("  支持格式: JSON格式 (ACCOUNTS_CONFIG) 或 单个账号 (ACCOUNT1_*, ACCOUNT2_*...)")
 
+    # 检查.env文件加载状态
+    env_files = ['.env', '.env.local', '.env.production']
+    loaded_env = None
+    for env_file in env_files:
+        if os.path.exists(env_file):
+            loaded_env = env_file
+            break
+
+    if loaded_env:
+        print(f"  环境变量文件: 已加载 {loaded_env}")
+    else:
+        print("  环境变量文件: 未找到 (使用系统环境变量)")
+
     # 加载配置
     account_manager.load_config()
 
@@ -1876,9 +2147,9 @@ def print_startup_info():
     if proxy:
         try:
             proxy_available = check_proxy(proxy)
-            print(f"  状态: {'✓ 可用' if proxy_available else '✗ 不可用'}")
+            print(f"  状态: {'[可用]' if proxy_available else '[不可用]'}")
         except:
-            print(f"  状态: ✗ 连接测试失败")
+            print(f"  状态: [连接测试失败]")
 
     # 图片基础URL配置
     image_base_url = account_manager.config.get("image_base_url")
@@ -1898,7 +2169,7 @@ def print_startup_info():
 
     if total > 0:
         for i, acc in enumerate(account_manager.accounts):
-            status = "✓" if account_manager.account_states.get(i, {}).get("available", True) else "✗"
+            status = "[可用]" if account_manager.account_states.get(i, {}).get("available", True) else "[不可用]"
             team_id = acc.get("team_id", "未知")
             # 只显示前8个字符以保护隐私
             team_id_display = team_id[:8] + "..." if len(team_id) > 8 else team_id
@@ -1914,7 +2185,7 @@ def print_startup_info():
     print(f"\n[模型配置]")
     if models:
         for model in models:
-            enabled = "✓" if model.get("enabled", True) else "✗"
+            enabled = "[启用]" if model.get("enabled", True) else "[禁用]"
             print(f"  {enabled} {model.get('id')}: {model.get('name', '')}")
     else:
         print("  - gemini-enterprise (默认)")
@@ -1963,9 +2234,12 @@ def print_startup_info():
 
 
 if __name__ == '__main__':
+    # 初始化日志系统
+    setup_logging()
+
     print_startup_info()
-    
+
     if not account_manager.accounts:
         print("[!] 警告: 没有配置任何账号")
-    
+
     app.run(host='0.0.0.0', port=7860, debug=False)
