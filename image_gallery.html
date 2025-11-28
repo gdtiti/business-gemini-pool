@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史图片相册 - Business Gemini Pool</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --primary-light: #e3f2fd;
+            --secondary: #ff6b6b;
+            --success: #51cf66;
+            --warning: #ffd93d;
+            --dark: #2c3e50;
+            --gray: #718096;
+            --light-gray: #f7fafc;
+            --white: #ffffff;
+            --border: #e2e8f0;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: var(--gray);
+            font-size: 1.1rem;
+        }
+
+        /* Search and Controls */
+        .controls {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 45px 12px 20px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        .search-box .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray);
+        }
+
+        .per-page-select {
+            padding: 10px 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--white);
+            cursor: pointer;
+        }
+
+        .per-page-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            color: var(--gray);
+            font-size: 14px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-item strong {
+            color: var(--primary);
+        }
+
+        /* Gallery Grid */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .image-card {
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .image-wrapper {
+            position: relative;
+            padding-bottom: 75%;
+            background: var(--light-gray);
+            overflow: hidden;
+        }
+
+        .image-wrapper img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .image-card:hover .image-wrapper img {
+            transform: scale(1.05);
+        }
+
+        .image-info {
+            padding: 15px;
+        }
+
+        .image-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .image-meta {
+            font-size: 13px;
+            color: var(--gray);
+            line-height: 1.5;
+        }
+
+        .image-date {
+            margin-bottom: 5px;
+        }
+
+        .image-size {
+            margin-bottom: 5px;
+        }
+
+        .image-dimensions {
+            margin-bottom: 8px;
+        }
+
+        .image-prompt {
+            font-style: italic;
+            color: var(--primary);
+            max-height: 3em;
+            overflow: hidden;
+            line-clamp: 2;
+            -webkit-line-clamp: 2;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+        }
+
+        /* Image Actions */
+        .image-actions {
+            display: flex;
+            gap: 10px;
+            padding: 0 15px 15px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .btn-primary:hover {
+            background: #3a7bc8;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--secondary);
+            color: var(--white);
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+            transform: translateY(-1px);
+        }
+
+        /* Pagination */
+        .pagination {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 10px 15px;
+            border: 2px solid var(--border);
+            background: var(--white);
+            color: var(--dark);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .pagination button.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pagination .page-info {
+            color: var(--gray);
+            font-size: 14px;
+            padding: 0 10px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            color: var(--gray);
+            margin-bottom: 20px;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            color: var(--dark);
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .empty-description {
+            color: var(--gray);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--gray);
+            font-size: 16px;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--dark);
+            color: var(--white);
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            display: none;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: 16px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--dark);
+            color: var(--white);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .modal-close:hover {
+            background: var(--secondary);
+        }
+
+        .modal-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .modal-info {
+            padding: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 20px;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-box {
+                min-width: auto;
+            }
+
+            .stats {
+                justify-content: center;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 15px;
+            }
+
+            .image-info {
+                padding: 10px;
+            }
+
+            .image-title {
+                font-size: 14px;
+            }
+
+            .image-meta {
+                font-size: 12px;
+            }
+
+            .btn {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid var(--white);
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 存储空间信息样式 */
+        .storage-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .storage-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .storage-stat {
+            text-align: center;
+        }
+
+        .storage-stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .storage-stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .storage-usage-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .storage-usage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ffd93d, #51cf66);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* 删除按钮样式 */
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .image-card:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            background: #ff5252;
+            transform: scale(1.1);
+        }
+
+        .delete-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 批量操作样式 */
+        .batch-operations {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            display: none;
+        }
+
+        .batch-select-all {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            margin-right: 8px;
+        }
+
+        .image-checkbox {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 10;
+        }
+
+        .image-card:hover .image-checkbox,
+        .image-card.selected .image-checkbox {
+            opacity: 1;
+        }
+
+        .image-card {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .image-card.selected {
+            border: 3px solid var(--primary);
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: var(--shadow-hover);
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+
+        .modal-message {
+            margin-bottom: 25px;
+            color: var(--gray);
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-cancel {
+            background: var(--light-gray);
+            color: var(--dark);
+        }
+
+        .modal-btn-confirm {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-checkbox {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🖼️ 历史图片相册</h1>
+            <p>查看和管理您生成的所有图片</p>
+        </div>
+
+        <!-- 存储空间信息 -->
+        <div class="storage-info" id="storageInfo">
+            <h3 style="margin: 0 0 10px 0;">存储空间</h3>
+            <div class="storage-stats">
+                <div class="storage-stat">
+                    <div class="storage-stat-value" id="totalImages">-</div>
+                    <div class="storage-stat-label">总图片数</div>
+                </div>
+                <div class="storage-stat">
+                    <div class="storage-stat-value" id="totalSize">-</div>
+                    <div class="storage-stat-label">图片占用</div>
+                </div>
+                <div class="storage-stat">
+                    <div class="storage-stat-value" id="diskUsage">-</div>
+                    <div class="storage-stat-label">磁盘使用率</div>
+                </div>
+                <div class="storage-stat">
+                    <div class="storage-stat-value" id="freeSpace">-</div>
+                    <div class="storage-stat-label">剩余空间</div>
+                </div>
+            </div>
+            <div class="storage-usage-bar">
+                <div class="storage-usage-fill" id="storageUsageFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 批量操作 -->
+        <div class="batch-operations" id="batchOperations">
+            <div class="batch-select-all">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="selectAllCheckbox" class="form-checkbox">
+                    <label for="selectAllCheckbox">全选</label>
+                </div>
+                <span id="selectedCount">已选择 0 张图片</span>
+            </div>
+            <div class="batch-actions">
+                <button class="btn btn-danger" id="batchDeleteBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 12 21"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4l5 5v0a2 2 0 0 0 2 2h2"></path>
+                    </svg>
+                    删除选中
+                </button>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索图片标题、描述或提示词...">
+                <span class="search-icon">🔍</span>
+            </div>
+            <select id="perPageSelect" class="per-page-select">
+                <option value="12">12 张/页</option>
+                <option value="20" selected>20 张/页</option>
+                <option value="36">36 张/页</option>
+                <option value="60">60 张/页</option>
+            </select>
+            <div class="stats">
+                <div class="stat-item">
+                    <span>总计:</span>
+                    <strong id="totalCount">0</strong>
+                    <span>张图片</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gallery -->
+        <div id="galleryContainer">
+            <div class="loading">
+                <div class="spinner"></div>
+                正在加载图片...
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div id="paginationContainer"></div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 确认删除模态框 -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-title">确认删除</div>
+            <div class="modal-message" id="modalMessage">
+                确定要删除这张图片吗？此操作无法撤销。
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" id="modalCancel">取消</button>
+                <button class="modal-btn modal-btn-confirm" id="modalConfirm">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量删除确认模态框 -->
+    <div class="modal" id="batchDeleteModal">
+        <div class="modal-content">
+            <div class="modal-title">批量删除确认</div>
+            <div class="modal-message" id="batchModalMessage">
+                确定要删除选中的 <span id="batchDeleteCount">0</span> 张图片吗？此操作无法撤销。
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" id="batchModalCancel">取消</button>
+                <button class="modal-btn modal-btn-confirm" id="batchModalConfirm">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img id="modalImage" class="modal-image" src="" alt="">
+            <div class="modal-info">
+                <h3 id="modalTitle"></h3>
+                <p id="modalDescription"></p>
+                <p><strong>生成提示词:</strong> <span id="modalPrompt"></span></p>
+                <p><strong>创建时间:</strong> <span id="modalDate"></span></p>
+                <p><strong>文件大小:</strong> <span id="modalSize"></span></p>
+                <p><strong>图片尺寸:</strong> <span id="modalDimensions"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentPage = 1;
+        let perPage = 20;
+        let searchQuery = '';
+        let isLoading = false;
+        let selectedImages = new Set();
+        let currentDeleteTarget = null;
+
+        // API configuration
+        const API_BASE = '/v1';
+        const getApiHeaders = () => {
+            const apiKey = localStorage.getItem('apiKey') || '';
+            return {
+                'Content-Type': 'application/json',
+                ...(apiKey && { 'Authorization': `Bearer ${apiKey}` })
+            };
+        };
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'success' ? 'var(--success)' : 'var(--secondary)';
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Loading functions
+        function showLoading() {
+            isLoading = true;
+            const container = document.getElementById('galleryContainer');
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    正在加载图片...
+                </div>
+            `;
+        }
+
+        function hideLoading() {
+            isLoading = false;
+        }
+
+        // Storage functions
+        async function loadStorageInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/images/statistics`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateStorageDisplay(data);
+
+            } catch (error) {
+                console.error('加载存储信息失败:', error);
+            }
+        }
+
+        function updateStorageDisplay(data) {
+            const storageInfo = data.storage_info || {};
+
+            // 更新统计数字
+            document.getElementById('totalImages').textContent = data.total_images || 0;
+            document.getElementById('totalSize').textContent = storageInfo.total_size_human || '0 B';
+            document.getElementById('diskUsage').textContent = `${storageInfo.usage_percentage || 0}%`;
+            document.getElementById('freeSpace').textContent = storageInfo.disk_free_human || '未知';
+
+            // 更新使用率条
+            const usagePercentage = Math.min(storageInfo.usage_percentage || 0, 100);
+            document.getElementById('storageUsageFill').style.width = `${usagePercentage}%`;
+        }
+
+        // Gallery functions
+        async function loadImages(page = 1, append = false) {
+            if (isLoading) return;
+
+            showLoading();
+
+            try {
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    per_page: perPage.toString()
+                });
+
+                if (searchQuery) {
+                    params.append('search', searchQuery);
+                }
+
+                const response = await fetch(`${API_BASE}/images?${params}`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!append) {
+                    renderGallery(data.images);
+                } else {
+                    appendToGallery(data.images);
+                }
+
+                renderPagination(data.pagination);
+                updateStats(data.pagination.total_count);
+
+            } catch (error) {
+                console.error('加载图片失败:', error);
+                const container = document.getElementById('galleryContainer');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">❌</div>
+                        <div class="empty-title">加载失败</div>
+                        <div class="empty-description">
+                            无法加载图片列表，请检查网络连接或刷新页面重试。
+                        </div>
+                    </div>
+                `;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderGallery(images) {
+            const container = document.getElementById('galleryContainer');
+
+            if (images.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🖼️</div>
+                        <div class="empty-title">暂无图片</div>
+                        <div class="empty-description">
+                            ${searchQuery ? '没有找到匹配的图片，尝试其他搜索词。' : '您还没有生成任何图片，开始创作吧！'}
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const galleryHTML = `
+                <div class="gallery">
+                    ${images.map(image => createImageCard(image)).join('')}
+                </div>
+            `;
+
+            container.innerHTML = galleryHTML;
+        }
+
+        function appendToGallery(images) {
+            const gallery = document.querySelector('.gallery');
+            if (!gallery) {
+                renderGallery(images);
+                return;
+            }
+
+            const newCardsHTML = images.map(image => createImageCard(image)).join('');
+            gallery.insertAdjacentHTML('beforeend', newCardsHTML);
+        }
+
+        function createImageCard(image) {
+            const title = image.title || image.filename;
+            const description = image.description || '';
+            const prompt = image.prompt || '';
+            const date = formatDate(image.created_at);
+            const size = formatFileSize(image.file_size);
+            const dimensions = image.image_width && image.image_height
+                ? `${image.image_width} × ${image.image_height}`
+                : '未知尺寸';
+
+            return `
+                <div class="image-card" data-id="${image.id}" data-filename="${image.filename}">
+                    <input type="checkbox" class="image-checkbox" onchange="toggleImageSelection(${image.id}, '${image.filename}', this.checked)">
+                    <button class="delete-btn" onclick="event.stopPropagation(); confirmDeleteImage('${image.filename}', '${title}')" title="删除图片">
+                        ×
+                    </button>
+                    <div class="image-wrapper" onclick="openImageModal('${image.filename}')">
+                        <img src="${image.url}" alt="${title}" loading="lazy">
+                    </div>
+                    <div class="image-info">
+                        <div class="image-title" title="${title}">${title}</div>
+                        <div class="image-meta">
+                            <div class="image-date">📅 ${date}</div>
+                            <div class="image-size">💾 ${size}</div>
+                            <div class="image-dimensions">📐 ${dimensions}</div>
+                            ${prompt ? `<div class="image-prompt" title="${prompt}">💭 ${prompt}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="image-actions">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); viewImage('${image.url}')">
+                            查看大图
+                        </button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); confirmDeleteImage('${image.filename}', '${title}')">
+                            删除
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPagination(pagination) {
+            const container = document.getElementById('paginationContainer');
+
+            if (pagination.total_pages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const { page, total_pages, has_prev, has_next } = pagination;
+
+            let paginationHTML = '';
+
+            // Previous button
+            if (has_prev) {
+                paginationHTML += `<button onclick="goToPage(${page - 1})">上一页</button>`;
+            }
+
+            // Page numbers
+            const startPage = Math.max(1, page - 2);
+            const endPage = Math.min(total_pages, page + 2);
+
+            if (startPage > 1) {
+                paginationHTML += `<button onclick="goToPage(1)">1</button>`;
+                if (startPage > 2) {
+                    paginationHTML += `<span class="page-info">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHTML += `<button
+                    onclick="goToPage(${i})"
+                    class="${i === page ? 'active' : ''}">${i}</button>`;
+            }
+
+            if (endPage < total_pages) {
+                if (endPage < total_pages - 1) {
+                    paginationHTML += `<span class="page-info">...</span>`;
+                }
+                paginationHTML += `<button onclick="goToPage(${total_pages})">${total_pages}</button>`;
+            }
+
+            // Next button
+            if (has_next) {
+                paginationHTML += `<button onclick="goToPage(${page + 1})">下一页</button>`;
+            }
+
+            // Page info
+            paginationHTML += `<span class="page-info">第 ${page} 页，共 ${total_pages} 页</span>`;
+
+            container.innerHTML = `
+                <div class="pagination">
+                    ${paginationHTML}
+                </div>
+            `;
+        }
+
+        function updateStats(totalCount) {
+            document.getElementById('totalCount').textContent = totalCount;
+        }
+
+        // Navigation functions
+        function goToPage(page) {
+            if (page === currentPage || isLoading) return;
+
+            currentPage = page;
+            loadImages(page);
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Search functions
+        function performSearch() {
+            searchQuery = document.getElementById('searchInput').value.trim();
+            currentPage = 1;
+            loadImages();
+        }
+
+        // Image functions
+        function viewImage(url) {
+            window.open(url, '_blank');
+        }
+
+        async function openImageModal(imageId) {
+            try {
+                const response = await fetch(`${API_BASE}/images/${imageId}`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const image = await response.json();
+
+                document.getElementById('modalImage').src = image.url;
+                document.getElementById('modalTitle').textContent = image.title || image.filename;
+                document.getElementById('modalDescription').textContent = image.description || '暂无描述';
+                document.getElementById('modalPrompt').textContent = image.prompt || '未知提示词';
+                document.getElementById('modalDate').textContent = formatDate(image.created_at);
+                document.getElementById('modalSize').textContent = formatFileSize(image.file_size);
+                document.getElementById('modalDimensions').textContent = image.image_width && image.image_height
+                    ? `${image.image_width} × ${image.image_height}`
+                    : '未知尺寸';
+
+                document.getElementById('imageModal').style.display = 'flex';
+
+            } catch (error) {
+                console.error('获取图片信息失败:', error);
+                showToast('获取图片信息失败', 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        // Image selection functions
+        function toggleImageSelection(imageId, filename, isSelected) {
+            if (isSelected) {
+                selectedImages.add(filename);
+            } else {
+                selectedImages.delete(filename);
+            }
+
+            // 更新UI
+            const card = document.querySelector(`[data-id="${imageId}"]`);
+            if (card) {
+                if (isSelected) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            }
+
+            updateBatchOperations();
+            updateSelectAllCheckbox();
+        }
+
+        function updateBatchOperations() {
+            const batchOps = document.getElementById('batchOperations');
+            const selectedCount = document.getElementById('selectedCount');
+
+            if (selectedImages.size > 0) {
+                batchOps.style.display = 'flex';
+                selectedCount.textContent = `已选择 ${selectedImages.size} 张图片`;
+            } else {
+                batchOps.style.display = 'none';
+            }
+        }
+
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const allCheckboxes = document.querySelectorAll('.image-checkbox');
+            const checkedCheckboxes = document.querySelectorAll('.image-checkbox:checked');
+
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && allCheckboxes.length === checkedCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkedCheckboxes.length > 0 && checkedCheckboxes.length < allCheckboxes.length;
+        }
+
+        // Delete functions
+        function confirmDeleteImage(filename, title) {
+            currentDeleteTarget = { filename, title };
+            document.getElementById('modalMessage').textContent =
+                `确定要删除图片 "${title}" 吗？此操作无法撤销。`;
+            document.getElementById('deleteModal').style.display = 'flex';
+        }
+
+        function confirmBatchDelete() {
+            document.getElementById('batchDeleteCount').textContent = selectedImages.size;
+            document.getElementById('batchDeleteModal').style.display = 'flex';
+        }
+
+        async function executeDelete(filename) {
+            try {
+                const response = await fetch(`${API_BASE}/images/delete`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({ filename })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                showToast(result.message || '图片删除成功', 'success');
+
+            } catch (error) {
+                console.error('删除图片失败:', error);
+                showToast('删除图片失败', 'error');
+            }
+        }
+
+        async function executeBatchDelete() {
+            try {
+                const filenames = Array.from(selectedImages);
+
+                const response = await fetch(`${API_BASE}/images/batch-delete`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({ filenames })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                showToast(
+                    `批量删除完成：成功删除 ${result.deleted_count} 张，失败 ${result.failed_count} 张`,
+                    result.failed_count > 0 ? 'error' : 'success'
+                );
+
+                // 清空选择
+                selectedImages.clear();
+                updateBatchOperations();
+
+            } catch (error) {
+                console.error('批量删除失败:', error);
+                showToast('批量删除失败', 'error');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', function() {
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(performSearch, 500);
+        });
+
+        document.getElementById('perPageSelect').addEventListener('change', function() {
+            perPage = parseInt(this.value);
+            currentPage = 1;
+            loadImages();
+        });
+
+        // 全选功能
+        document.getElementById('selectAllCheckbox').addEventListener('change', function() {
+            const allCheckboxes = document.querySelectorAll('.image-checkbox');
+            allCheckboxes.forEach(checkbox => {
+                const card = checkbox.closest('.image-card');
+                const imageId = card.dataset.id;
+                const filename = card.dataset.filename;
+
+                if (checkbox.checked !== this.checked) {
+                    checkbox.checked = this.checked;
+                    toggleImageSelection(imageId, filename, this.checked);
+                }
+            });
+        });
+
+        // 批量删除按钮
+        document.getElementById('batchDeleteBtn').addEventListener('click', confirmBatchDelete);
+
+        // 模态框按钮事件
+        document.getElementById('modalConfirm').addEventListener('click', function() {
+            if (currentDeleteTarget) {
+                executeDelete(currentDeleteTarget.filename).then(() => {
+                    loadImages(currentPage);
+                    loadStorageInfo(); // 刷新存储信息
+                });
+                currentDeleteTarget = null;
+            }
+            document.getElementById('deleteModal').style.display = 'none';
+        });
+
+        document.getElementById('modalCancel').addEventListener('click', function() {
+            currentDeleteTarget = null;
+            document.getElementById('deleteModal').style.display = 'none';
+        });
+
+        document.getElementById('batchModalConfirm').addEventListener('click', function() {
+            executeBatchDelete().then(() => {
+                loadImages(currentPage);
+                loadStorageInfo(); // 刷新存储信息
+            });
+            document.getElementById('batchDeleteModal').style.display = 'none';
+        });
+
+        document.getElementById('batchModalCancel').addEventListener('click', function() {
+            document.getElementById('batchDeleteModal').style.display = 'none';
+        });
+
+        // 模态框点击外部关闭
+        ['deleteModal', 'batchDeleteModal'].forEach(modalId => {
+            document.getElementById(modalId).addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                    currentDeleteTarget = null;
+                }
+            });
+        });
+
+        // Modal close on outside click
+        document.getElementById('imageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            } else if (e.key === 'ArrowLeft' && currentPage > 1) {
+                goToPage(currentPage - 1);
+            } else if (e.key === 'ArrowRight') {
+                // We need to check if there's a next page, but we don't have that info here
+                // For now, just try to go to next page
+                goToPage(currentPage + 1);
+            }
+        });
+
+        // Infinite scroll (optional enhancement)
+        let scrollTimeout;
+        window.addEventListener('scroll', function() {
+            if (isLoading) return;
+
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
+                    // Load next page if we're not on the last page
+                    const nextPageBtn = document.querySelector('.pagination button:not(:disabled):last-of-type');
+                    if (nextPageBtn && !nextPageBtn.classList.contains('active')) {
+                        nextPageBtn.click();
+                    }
+                }
+            }, 100);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadImages();
+            loadStorageInfo();
+        });
+
+        // Periodic refresh (optional, every 30 seconds)
+        setInterval(() => {
+            if (!isLoading && !document.hidden) {
+                loadImages(currentPage);
+                loadStorageInfo();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

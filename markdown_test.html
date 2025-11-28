@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 渲染测试</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .markdown-output {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .markdown-output .bubble {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        /* 复用聊天页面的markdown样式 */
+        .bubble .md-header {
+            margin: 16px 0 8px 0;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.3;
+        }
+        .bubble .md-h1 { font-size: 1.5em; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+        .bubble .md-h2 { font-size: 1.3em; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
+        .bubble .md-h3 { font-size: 1.1em; }
+        .bubble .md-h4 { font-size: 1.05em; }
+        .bubble .md-h5 { font-size: 1em; }
+        .bubble .md-h6 { font-size: 0.9em; color: #64748b; }
+
+        .bubble .code-block {
+            margin: 12px 0;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            background: #f8fafc;
+        }
+        .bubble .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f1f5f9;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px;
+        }
+        .bubble .code-language {
+            color: #64748b;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        .bubble .code-copy-btn {
+            padding: 4px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background: white;
+            color: #1e293b;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .bubble .code-copy-btn:hover {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .bubble .code-block pre {
+            margin: 0;
+            padding: 12px;
+            overflow-x: auto;
+            background: transparent;
+        }
+        .bubble .code-block code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #1e293b;
+        }
+        .bubble .inline-code {
+            background: #f1f5f9;
+            color: #2563eb;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            border: 1px solid #e2e8f0;
+        }
+        .bubble strong {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .bubble em {
+            font-style: italic;
+            color: #1e293b;
+        }
+        .bubble del {
+            text-decoration: line-through;
+            color: #64748b;
+        }
+        .bubble .md-image-container {
+            margin: 12px 0;
+            text-align: center;
+        }
+        .bubble .md-image {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .bubble .md-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .bubble a {
+            color: #2563eb;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .bubble a:hover {
+            border-bottom-color: #2563eb;
+        }
+        .bubble .md-blockquote {
+            margin: 12px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #2563eb;
+            background: rgba(37, 99, 235, 0.1);
+            border-radius: 0 8px 8px 0;
+            font-style: italic;
+        }
+        .bubble .md-list, .bubble .md-ordered-list {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+        .bubble .md-list li, .bubble .md-ordered-list li {
+            margin: 6px 0;
+            line-height: 1.5;
+        }
+        .bubble .md-ordered-list {
+            list-style-type: decimal;
+        }
+        .bubble .md-list {
+            list-style-type: disc;
+        }
+        .bubble p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .bubble p:first-child {
+            margin-top: 0;
+        }
+        .bubble p:last-child {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Markdown 渲染功能测试</h1>
+
+    <div class="test-section">
+        <h2>🖼️ 图片测试</h2>
+        <div class="markdown-output">
+            <div class="bubble" id="image-test"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📝 代码块测试</h2>
+        <div class="markdown-output">
+            <div class="bubble" id="code-test"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 列表测试</h2>
+        <div class="markdown-output">
+            <div class="bubble" id="list-test"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔗 链接和格式测试</h2>
+        <div class="markdown-output">
+            <div class="bubble" id="format-test"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📄 综合测试</h2>
+        <div class="markdown-output">
+            <div class="bubble" id="comprehensive-test"></div>
+        </div>
+    </div>
+
+    <script>
+        // 复制 markdown 渲染器的代码
+        class SimpleMarkdownRenderer {
+            constructor() {
+                this.rules = [
+                    { type: 'header', regex: /^(#{1,6})\s+(.+)$/gm, replacement: this.renderHeader.bind(this) },
+                    { type: 'code_block', regex: /```(\w*)\n([\s\S]*?)```/g, replacement: this.renderCodeBlock.bind(this) },
+                    { type: 'inline_code', regex: /`([^`]+)`/g, replacement: '<code class="inline-code">$1</code>' },
+                    { type: 'bold', regex: /\*\*([^*]+)\*\*/g, replacement: '<strong>$1</strong>' },
+                    { type: 'italic', regex: /\*([^*]+)\*/g, replacement: '<em>$1</em>' },
+                    { type: 'strikethrough', regex: /~~([^~]+)~~/g, replacement: '<del>$1</del>' },
+                    { type: 'image', regex: /!\[([^\]]*)\]\(([^)]+)\)/g, replacement: this.renderImage.bind(this) },
+                    { type: 'link', regex: /\[([^\]]+)\]\(([^)]+)\)/g, replacement: '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>' },
+                    { type: 'blockquote', regex: /^>\s+(.+)$/gm, replacement: this.renderBlockquote.bind(this) },
+                    { type: 'list_item', regex: /^[-*+]\s+(.+)$/gm, replacement: '<li>$1</li>' },
+                    { type: 'ordered_list', regex: /^\d+\.\s+(.+)$/gm, replacement: '<li>$1</li>' },
+                    { type: 'line_break', regex: /\n\n/g, replacement: '</p><p>' },
+                    { type: 'single_line_break', regex: /\n/g, replacement: '<br>' }
+                ];
+            }
+
+            render(text) {
+                if (!text) return '';
+
+                let html = this.escapeHtml(text);
+
+                // 先处理代码块，避免被其他规则干扰
+                html = this.renderCodeBlocks(html);
+
+                // 处理其他规则
+                for (const rule of this.rules) {
+                    if (rule.type !== 'code_block') {
+                        html = html.replace(rule.regex, rule.replacement);
+                    }
+                }
+
+                // 处理列表
+                html = this.renderLists(html);
+
+                // 段落包装
+                if (html.trim()) {
+                    html = '<p>' + html + '</p>';
+                }
+
+                return html;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            renderCodeBlocks(text) {
+                const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+                return text.replace(codeBlockRegex, (match, language, code) => {
+                    const lang = language || 'text';
+                    return `<div class="code-block">
+                        <div class="code-header">
+                            <span class="code-language">${lang}</span>
+                            <button class="code-copy-btn" onclick="copyCode(this)">复制</button>
+                        </div>
+                        <pre><code class="language-${lang}">${this.escapeHtml(code.trim())}</code></pre>
+                    </div>`;
+                });
+            }
+
+            renderHeader(match, hashes, content) {
+                const level = hashes.length;
+                return `<h${level} class="md-header md-h${level}">${content}</h${level}>`;
+            }
+
+            renderImage(match, alt, src) {
+                const absoluteSrc = src.startsWith('http') ? src : `${window.location.origin}/${src}`;
+                return `<div class="md-image-container">
+                    <img src="${absoluteSrc}" alt="${alt}" class="md-image"
+                         onclick="window.open('${absoluteSrc}', '_blank')"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="md-image-error" style="display:none;">
+                        🖼️ <span>${alt || '图片'}</span><br>
+                        <small>图片加载失败: ${this.escapeHtml(src)}</small>
+                    </div>
+                </div>`;
+            }
+
+            renderBlockquote(match, content) {
+                return `<blockquote class="md-blockquote">${content}</blockquote>`;
+            }
+
+            renderLists(text) {
+                // 处理无序列表
+                text = text.replace(/(<li>.*?<\/li>)/gs, (match) => {
+                    if (match.includes('- ') || match.includes('* ') || match.includes('+ ')) {
+                        return '<ul class="md-list">' + match + '</ul>';
+                    }
+                    return match;
+                });
+
+                // 处理有序列表
+                text = text.replace(/(<li>.*?<\/li>)/gs, (match) => {
+                    if (/\d+\./.test(match)) {
+                        return '<ol class="md-ordered-list">' + match + '</ol>';
+                    }
+                    return match;
+                });
+
+                return text;
+            }
+        }
+
+        const markdownRenderer = new SimpleMarkdownRenderer();
+
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block');
+            const code = codeBlock.querySelector('code');
+
+            if (code) {
+                const text = code.textContent;
+
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showCopySuccess(button);
+                    }).catch(err => {
+                        fallbackCopyCode(text, button);
+                    });
+                } else {
+                    fallbackCopyCode(text, button);
+                }
+            }
+        }
+
+        function fallbackCopyCode(text, button) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            textArea.style.pointerEvents = 'none';
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(button);
+                } else {
+                    showCopyError(button);
+                }
+            } catch (err) {
+                showCopyError(button);
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopySuccess(button) {
+            const originalText = button.textContent;
+            button.textContent = '已复制';
+            button.style.background = '#10b981';
+            button.style.color = 'white';
+            button.style.borderColor = '#10b981';
+
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = 'white';
+                button.style.color = '#1e293b';
+                button.style.borderColor = '#e2e8f0';
+            }, 2000);
+        }
+
+        function showCopyError(button) {
+            const originalText = button.textContent;
+            button.textContent = '复制失败';
+            button.style.background = '#ef4444';
+            button.style.color = 'white';
+            button.style.borderColor = '#ef4444';
+
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = 'white';
+                button.style.color = '#1e293b';
+                button.style.borderColor = '#e2e8f0';
+            }, 2000);
+        }
+
+        // 测试用例
+        const testCases = {
+            imageTest: `![测试图片](http://127.0.0.1:7860/image/image_1764318393081883.png)`,
+            codeTest: `\`\`\`python
+def hello_world():
+    print("Hello, World!")
+    return True
+
+# 这是一个Python函数
+\`\`\`
+
+这是行内代码：\`console.log("Hello")\``,
+            listTest: `### 任务列表
+
+#### 待办事项
+- [x] 完成 Markdown 渲染器
+- [ ] 添加代码高亮
+- [ ] 支持表格渲染
+- [ ] 添加数学公式支持
+
+#### 优先级任务
+1. 修复图片显示问题
+2. 优化代码块样式
+3. 改进移动端适配`,
+            formatTest: `## 格式测试
+
+这是 **粗体文本** 和 *斜体文本* 的示例。
+
+这里有一个 ~~删除线~~ 的文本。
+
+你可以访问 [Google](https://google.com) 或 [GitHub](https://github.com)。
+
+> 这是一个引用块
+> 可以用来强调重要内容
+
+\`const message = "Hello Markdown!";\``,
+            comprehensiveTest: `# 🎨 Markdown 综合测试
+
+## 基础格式
+
+欢迎使用 **Business Gemini** 的 Markdown 渲染器！这里支持丰富的文本格式：
+
+- **粗体文本**: 用于强调重要内容
+- *斜体文本*: 用于突出显示
+- ~~删除线~~: 表示已过时的内容
+- \`行内代码\`: 用于显示代码片段
+
+## 📋 代码示例
+
+### Python 示例
+\`\`\`python
+def calculate_fibonacci(n):
+    """计算斐波那契数列"""
+    if n <= 1:
+        return n
+    return calculate_fibonacci(n-1) + calculate_fibonacci(n-2)
+
+# 测试函数
+for i in range(10):
+    print(f"F({i}) = {calculate_fibonacci(i)}")
+\`\`\`
+
+### JavaScript 示例
+\`\`\`javascript
+const fibonacci = (n) => {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+};
+
+// 使用 ES6 语法
+const results = Array.from({length: 10}, (_, i) => fibonacci(i));
+console.log(results);
+\`\`\`
+
+## 🖼️ 图片展示
+
+![生成的图片](http://127.0.0.1:7860/image/image_1764318393081883.png)
+
+> 💡 **提示**: 点击图片可以在新窗口中查看大图
+
+## 📊 列表
+
+### 无序列表
+- 前端开发
+  - HTML/CSS/JavaScript
+  - React/Vue/Angular
+- 后端开发
+  - Python/Java/Node.js
+  - 数据库设计
+
+### 有序列表
+1. 需求分析
+2. 系统设计
+3. 编码实现
+4. 测试验证
+5. 部署上线
+
+## 🔗 有用链接
+
+- [Markdown 语法指南](https://www.markdownguide.org)
+- [GitHub Flavored Markdown](https://github.github.com/github-flavored-markdown/)
+- [CommonMark 规范](https://commonmark.org/)
+
+> 🚀 **开始使用**: 尝试在聊天中使用各种 Markdown 格式！`
+        };
+
+        // 渲染测试用例
+        document.getElementById('image-test').innerHTML = markdownRenderer.render(testCases.imageTest);
+        document.getElementById('code-test').innerHTML = markdownRenderer.render(testCases.codeTest);
+        document.getElementById('list-test').innerHTML = markdownRenderer.render(testCases.listTest);
+        document.getElementById('format-test').innerHTML = markdownRenderer.render(testCases.formatTest);
+        document.getElementById('comprehensive-test').innerHTML = markdownRenderer.render(testCases.comprehensiveTest);
+    </script>
+</body>
+</html>
