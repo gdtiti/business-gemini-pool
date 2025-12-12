@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计分析 - Business Gemini Pool</title>
+    <style>
+        /* 基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 头部样式 */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: #333;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-detail {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        /* 图表容器 */
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-container h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        .chart {
+            height: 300px;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow-x: auto;
+        }
+
+        .chart-bar {
+            min-width: 60px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 5px 5px 0 0;
+            position: relative;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+
+        .chart-bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+
+        .chart-bar-value {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 表格样式 */
+        .table-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        .table-container h3 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+
+        /* 徽章样式 */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        /* 加载动画 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 错误样式 */
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .chart {
+                min-height: 200px;
+            }
+
+            .nav-buttons {
+                justify-content: center;
+            }
+
+            .table-container {
+                padding: 15px;
+            }
+
+            th, td {
+                padding: 8px;
+                font-size: 0.9em;
+            }
+        }
+
+        /* 图标样式 */
+        .icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            text-align: center;
+            line-height: 24px;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .control-group select,
+        .control-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .refresh-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            align-self: flex-end;
+        }
+
+        .refresh-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>📊 统计分析中心</h1>
+            <p>Business Gemini Pool 详细使用统计和分析</p>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <a href="index.html" class="nav-btn">
+                <span class="icon">🏠</span>
+                <span>主页</span>
+            </a>
+            <a href="conversation_manager.html" class="nav-btn">
+                <span class="icon">💬</span>
+                <span>会话管理</span>
+            </a>
+            <a href="chat_history.html" class="nav-btn">
+                <span class="icon">📝</span>
+                <span>聊天历史</span>
+            </a>
+            <a href="image_gallery.html" class="nav-btn">
+                <span class="icon">🖼️</span>
+                <span>图片相册</span>
+            </a>
+            <a href="analytics.html" class="nav-btn">
+                <span class="icon">📊</span>
+                <span>统计分析</span>
+            </a>
+            <a href="api_key_manager.html" class="nav-btn active">
+                <span class="icon">🔑</span>
+                <span>密钥管理</span>
+            </a>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="timeRange">时间范围</label>
+                <select id="timeRange">
+                    <option value="7">最近7天</option>
+                    <option value="30" selected>最近30天</option>
+                    <option value="90">最近90天</option>
+                    <option value="365">最近1年</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="refreshInterval">自动刷新</label>
+                <select id="refreshInterval">
+                    <option value="0">关闭</option>
+                    <option value="30">30秒</option>
+                    <option value="60">1分钟</option>
+                    <option value="300">5分钟</option>
+                </select>
+            </div>
+            <button class="refresh-btn" onclick="refreshData()">
+                <span>🔄 刷新数据</span>
+            </button>
+        </div>
+
+        <!-- 总体统计 -->
+        <div id="overviewSection">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>正在加载统计数据...</div>
+            </div>
+        </div>
+
+        <!-- 生成时间线图表 -->
+        <div id="timelineSection" style="display: none;">
+            <div class="chart-container">
+                <h3>📈 图片生成时间线</h3>
+                <div id="timelineChart" class="chart"></div>
+            </div>
+        </div>
+
+        <!-- 模型使用统计 -->
+        <div id="modelsSection" style="display: none;">
+            <div class="table-container">
+                <h3>🤖 模型使用统计</h3>
+                <div id="modelsTable"></div>
+            </div>
+        </div>
+
+        <!-- API密钥统计 -->
+        <div id="apiKeysSection" style="display: none;">
+            <div class="table-container">
+                <h3>🔑 API密钥使用统计</h3>
+                <div id="apiKeysTable"></div>
+            </div>
+        </div>
+
+        <!-- 热门关键词 -->
+        <div id="keywordsSection" style="display: none;">
+            <div class="table-container">
+                <h3>🔥 热门关键词分析</h3>
+                <div id="keywordsTable"></div>
+            </div>
+        </div>
+
+        <!-- 用户活动统计 -->
+        <div id="usersSection" style="display: none;">
+            <div class="table-container">
+                <h3>👥 用户活动统计</h3>
+                <div id="usersTable"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/v1/analytics';
+        let refreshTimer = null;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            setupEventListeners();
+        });
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            document.getElementById('timeRange').addEventListener('change', refreshData);
+            document.getElementById('refreshInterval').addEventListener('change', function() {
+                const interval = parseInt(this.value);
+                if (interval > 0) {
+                    clearInterval(refreshTimer);
+                    refreshTimer = setInterval(refreshData, interval * 1000);
+                } else {
+                    clearInterval(refreshTimer);
+                }
+            });
+        }
+
+        // 获取API请求头
+        function getApiHeaders() {
+            const apiKey = localStorage.getItem('gemini_api_key') || '';
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (apiKey) {
+                headers['Authorization'] = `Bearer ${apiKey}`;
+            }
+            return headers;
+        }
+
+        // 刷新所有数据
+        async function refreshData() {
+            try {
+                await Promise.all([
+                    loadOverviewData(),
+                    loadTimelineData(),
+                    loadModelsData(),
+                    loadApiKeysData(),
+                    loadKeywordsData(),
+                    loadUsersData()
+                ]);
+            } catch (error) {
+                console.error('刷新数据失败:', error);
+                showError('数据加载失败，请稍后重试');
+            }
+        }
+
+        // 加载概览数据
+        async function loadOverviewData() {
+            try {
+                const days = document.getElementById('timeRange').value;
+                const response = await fetch(`${API_BASE}/overview?days=${days}`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取概览数据失败');
+
+                const data = await response.json();
+                renderOverviewStats(data);
+            } catch (error) {
+                console.error('加载概览数据失败:', error);
+            }
+        }
+
+        // 渲染概览统计
+        function renderOverviewStats(data) {
+            const container = document.getElementById('overviewSection');
+
+            if (data.error) {
+                container.innerHTML = `<div class="error">${data.error}</div>`;
+                return;
+            }
+
+            const html = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>📊 总体统计</h3>
+                        <div class="stat-value">${data.overall.total_generations}</div>
+                        <div class="stat-detail">图片生成总数</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>✅ 成功率</h3>
+                        <div class="stat-value">${data.overall.success_rate}%</div>
+                        <div class="stat-detail">成功: ${data.overall.successful_generations} / ${data.overall.total_generations}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>🔑 活跃密钥</h3>
+                        <div class="stat-value">${data.overall.active_api_keys}</div>
+                        <div class="stat-detail">正在使用的API密钥数量</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>👥 活跃用户</h3>
+                        <div class="stat-value">${data.overall.unique_users}</div>
+                        <div class="stat-detail">生成图片的唯一用户数</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>⚡ 平均耗时</h3>
+                        <div class="stat-value">${Math.round(data.overall.avg_generation_duration_ms)}ms</div>
+                        <div class="stat-detail">单张图片平均生成时间</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>📅 活跃天数</h3>
+                        <div class="stat-value">${data.overall.active_days}</div>
+                        <div class="stat-detail">最近${data.time_range_days}天内的活跃天数</div>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // 加载时间线数据
+        async function loadTimelineData() {
+            try {
+                const days = Math.min(parseInt(document.getElementById('timeRange').value), 7);
+                const response = await fetch(`${API_BASE}/timeline?days=${days}`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取时间线数据失败');
+
+                const data = await response.json();
+                renderTimelineChart(data.timeline);
+            } catch (error) {
+                console.error('加载时间线数据失败:', error);
+            }
+        }
+
+        // 渲染时间线图表
+        function renderTimelineChart(data) {
+            const container = document.getElementById('timelineSection');
+            const chartContainer = document.getElementById('timelineChart');
+
+            if (!data || data.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            // 找出最大值
+            const maxValue = Math.max(...data.map(item => item.total_generations));
+
+            let chartHTML = '';
+            data.reverse().forEach(item => {
+                const height = (item.total_generations / maxValue) * 250;
+                const date = new Date(item.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+
+                chartHTML += `
+                    <div class="chart-bar" style="height: ${height}px;" title="${date}: ${item.total_generations}张图片">
+                        <div class="chart-bar-value">${item.total_generations}</div>
+                        <div class="chart-bar-label">${date}</div>
+                    </div>
+                `;
+            });
+
+            chartContainer.innerHTML = chartHTML;
+            container.style.display = 'block';
+        }
+
+        // 加载模型数据
+        async function loadModelsData() {
+            try {
+                const response = await fetch(`${API_BASE}/models`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取模型数据失败');
+
+                const data = await response.json();
+                renderModelsTable(data.models);
+            } catch (error) {
+                console.error('加载模型数据失败:', error);
+            }
+        }
+
+        // 渲染模型表格
+        function renderModelsTable(data) {
+            const container = document.getElementById('modelsSection');
+            const tableContainer = document.getElementById('modelsTable');
+
+            if (!data || data.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>模型名称</th>
+                            <th>总请求</th>
+                            <th>成功请求</th>
+                            <th>成功率</th>
+                            <th>生成图片</th>
+                            <th>最后使用</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(model => {
+                const successRate = model.success_rate_percent || 0;
+                const lastUsed = model.last_used_at ? new Date(model.last_used_at).toLocaleString('zh-CN') : '从未使用';
+                const statusBadge = model.is_active ? '<span class="badge badge-success">活跃</span>' : '<span class="badge badge-warning">非活跃</span>';
+
+                tableHTML += `
+                    <tr>
+                        <td><strong>${model.model_name}</strong></td>
+                        <td>${model.total_requests}</td>
+                        <td>${model.successful_requests}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="progress-bar" style="flex: 1;">
+                                    <div class="progress-fill" style="width: ${successRate}%"></div>
+                                </div>
+                                <span>${successRate}%</span>
+                            </div>
+                        </td>
+                        <td>${model.total_images_generated}</td>
+                        <td>${lastUsed}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+            container.style.display = 'block';
+        }
+
+        // 加载API密钥数据
+        async function loadApiKeysData() {
+            try {
+                const response = await fetch(`${API_BASE}/api-keys?limit=15`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取API密钥数据失败');
+
+                const data = await response.json();
+                renderApiKeysTable(data.api_keys);
+            } catch (error) {
+                console.error('加载API密钥数据失败:', error);
+            }
+        }
+
+        // 渲染API密钥表格
+        function renderApiKeysTable(data) {
+            const container = document.getElementById('apiKeysSection');
+            const tableContainer = document.getElementById('apiKeysTable');
+
+            if (!data || data.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>API密钥</th>
+                            <th>Team ID</th>
+                            <th>总请求</th>
+                            <th>成功率</th>
+                            <th>生成图片</th>
+                            <th>平均耗时</th>
+                            <th>最后使用</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(apiKey => {
+                const successRate = apiKey.success_rate_percent || 0;
+                const lastUsed = apiKey.last_used_at ? new Date(apiKey.last_used_at).toLocaleString('zh-CN') : '从未使用';
+                const maskedKey = apiKey.api_key_masked || '未知';
+
+                tableHTML += `
+                    <tr>
+                        <td><code>${maskedKey}</code></td>
+                        <td>${apiKey.account_team_id || '未知'}</td>
+                        <td>${apiKey.total_requests}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="progress-bar" style="flex: 1;">
+                                    <div class="progress-fill" style="width: ${successRate}%"></div>
+                                </div>
+                                <span>${successRate}%</span>
+                            </div>
+                        </td>
+                        <td>${apiKey.total_images_generated}</td>
+                        <td>${apiKey.avg_images_per_request || 0}</td>
+                        <td>${lastUsed}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+            container.style.display = 'block';
+        }
+
+        // 加载关键词数据
+        async function loadKeywordsData() {
+            try {
+                const response = await fetch(`${API_BASE}/keywords?limit=20`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取关键词数据失败');
+
+                const data = await response.json();
+                renderKeywordsTable(data.keywords);
+            } catch (error) {
+                console.error('加载关键词数据失败:', error);
+            }
+        }
+
+        // 渲染关键词表格
+        function renderKeywordsTable(data) {
+            const container = document.getElementById('keywordsSection');
+            const tableContainer = document.getElementById('keywordsTable');
+
+            if (!data || data.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>关键词</th>
+                            <th>使用次数</th>
+                            <th>使用用户数</th>
+                            <th>生成图片数</th>
+                            <th>最后使用</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(keyword => {
+                const lastUsed = keyword.last_used_at ? new Date(keyword.last_used_at).toLocaleString('zh-CN') : '未知';
+
+                tableHTML += `
+                    <tr>
+                        <td><strong>${keyword.keyword}</strong></td>
+                        <td>${keyword.usage_count}</td>
+                        <td>${keyword.unique_users}</td>
+                        <td>${keyword.total_images_generated}</td>
+                        <td>${lastUsed}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+            container.style.display = 'block';
+        }
+
+        // 加载用户数据
+        async function loadUsersData() {
+            try {
+                const response = await fetch(`${API_BASE}/users?limit=15`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取用户数据失败');
+
+                const data = await response.json();
+                renderUsersTable(data.users);
+            } catch (error) {
+                console.error('加载用户数据失败:', error);
+            }
+        }
+
+        // 渲染用户表格
+        function renderUsersTable(data) {
+            const container = document.getElementById('usersSection');
+            const tableContainer = document.getElementById('usersTable');
+
+            if (!data || data.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户ID</th>
+                            <th>总请求</th>
+                            <th>成功请求</th>
+                            <th>生成图片</th>
+                            <th>总耗时</th>
+                            <th>首次请求</th>
+                            <th>最后请求</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.forEach(user => {
+                const firstRequest = user.first_request_at ? new Date(user.first_request_at).toLocaleString('zh-CN') : '未知';
+                const lastRequest = user.last_request_at ? new Date(user.last_request_at).toLocaleString('zh-CN') : '未知';
+                const userId = user.user_id ? user.user_id.substring(0, 8) + '***' : '未知';
+
+                tableHTML += `
+                    <tr>
+                        <td><code>${userId}</code></td>
+                        <td>${user.total_requests}</td>
+                        <td>${user.successful_requests}</td>
+                        <td>${user.total_images_generated}</td>
+                        <td>${Math.round(user.total_generation_time / 1000)}秒</td>
+                        <td>${firstRequest}</td>
+                        <td>${lastRequest}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            tableContainer.innerHTML = tableHTML;
+            container.style.display = 'block';
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const container = document.getElementById('overviewSection');
+            container.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+    </script>
+</body>
+</html>

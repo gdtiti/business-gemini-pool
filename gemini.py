@@ -155,27 +155,54 @@ app = Flask(__name__, static_folder='.')
 CORS(app)
 
 
+# 在模块级别缓存环境变量，避免重复读取
+_auth_config = None
+_last_auth_config = None
+
+def get_auth_config():
+    """获取认证配置，每次都重新读取环境变量以确保配置是最新的"""
+    # 每次都重新读取环境变量以获取最新配置
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
+    require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true'
+    required_api_key = os.getenv('DOWNSTREAM_API_KEY', '')
+
+    auth_config = {
+        'require_auth': require_auth,
+        'required_api_key': required_api_key,
+        'config_valid': require_auth and bool(required_api_key)
+    }
+
+    # 只在配置改变时打印日志（通过全局变量跟踪上次配置）
+    global _last_auth_config
+    current_config_str = f"{require_auth}:{'*' * 10 if required_api_key else 'NOT_SET'}"
+    if _last_auth_config != current_config_str:
+        print(f"[认证] 配置已更新: REQUIRE_AUTH={require_auth}, API_KEY={'*' * 10 if required_api_key else 'NOT_SET'}")
+        _last_auth_config = current_config_str
+
+    return auth_config
+
 def require_api_key(f):
     """API Key 鉴权装饰器"""
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # 检查环境变量是否启用鉴权
-        require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() == 'true'
+        auth_config = get_auth_config()
 
-        if not require_auth:
+        # 如果未启用鉴权，直接通过
+        if not auth_config['require_auth']:
             return f(*args, **kwargs)
 
-        # 获取配置的 API key
-        required_api_key = os.getenv('DOWNSTREAM_API_KEY', '')
-        if not required_api_key:
+        # 检查配置是否有效
+        if not auth_config['config_valid']:
             return jsonify({
                 "error": {
                     "message": "Server requires authentication but API key not configured",
                     "type": "configuration_error",
                     "suggestion": "Please set DOWNSTREAM_API_KEY environment variable"
                 }
-            }), 503  # Service Unavailable 更合适
+            }), 503
 
         # 从请求头获取 API key
         provided_api_key = request.headers.get('Authorization', '').replace('Bearer ', '').replace('Api-Key ', '')
@@ -189,7 +216,8 @@ def require_api_key(f):
                 }
             }), 401
 
-        if provided_api_key != required_api_key:
+        # 验证API密钥
+        if provided_api_key != auth_config['required_api_key']:
             return jsonify({
                 "error": {
                     "message": "Invalid API key",
@@ -199,6 +227,32 @@ def require_api_key(f):
 
         return f(*args, **kwargs)
     return decorated_function
+
+# 导入统计分析模块
+analytics_manager = None
+get_analytics_manager = None
+init_analytics_routes = None
+set_auth_decorator = None
+
+try:
+    from analytics_apis import get_analytics_manager, init_analytics_routes, set_auth_decorator
+    # 设置认证装饰器
+    set_auth_decorator(require_api_key)
+    analytics_manager = get_analytics_manager()
+    print("统计分析模块加载成功")
+except ImportError as e:
+    print(f"警告: 无法导入统计分析模块: {e}")
+    analytics_manager = None
+    get_analytics_manager = None
+    init_analytics_routes = None
+    set_auth_decorator = None
+
+# 初始化统计分析API路由
+if init_analytics_routes is not None:
+    init_analytics_routes(app)
+    print("[统计] 分析API路由已初始化")
+else:
+    print("[警告] 统计分析模块未加载，跳过API路由初始化")
 
 
 def load_config_from_env() -> dict:
@@ -212,24 +266,43 @@ def load_config_from_env() -> dict:
         "require_auth": os.getenv("REQUIRE_AUTH", "false").lower() == "true"
     }
 
-    # 从JSON格式加载账号配置
-    accounts_json = os.getenv("ACCOUNTS_CONFIG", "[]")
-    try:
-        if accounts_json and accounts_json.strip():
-            # 处理环境变量中的引号问题
-            accounts_json = accounts_json.strip()
-            # 如果字符串被单引号包围，去掉单引号
-            if accounts_json.startswith("'") and accounts_json.endswith("'"):
-                accounts_json = accounts_json[1:-1]
-            # 如果字符串被双引号包围，去掉双引号
-            elif accounts_json.startswith('"') and accounts_json.endswith('"'):
-                accounts_json = accounts_json[1:-1]
+    # 优先从accounts.json文件加载账号配置
+    accounts_file_path = Path("accounts.json")
+    if accounts_file_path.exists():
+        try:
+            with open(accounts_file_path, 'r', encoding='utf-8') as f:
+                file_accounts = json.load(f)
 
-            config["accounts"] = json.loads(accounts_json)
-            print(f"[配置] 从ACCOUNTS_CONFIG加载了 {len(config['accounts'])} 个账号")
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"[!] ACCOUNTS_CONFIG JSON解析错误: {e}")
-        print(f"[!] 原始值: {accounts_json}")
+            if file_accounts and isinstance(file_accounts, list):
+                config["accounts"] = file_accounts
+                print(f"[配置] 从accounts.json文件加载了 {len(config['accounts'])} 个账号")
+            else:
+                print(f"[!] accounts.json文件格式错误，应为账号数组")
+        except (json.JSONDecodeError, IOError, Exception) as e:
+            print(f"[!] 读取accounts.json文件失败: {e}")
+            print("[!] 将尝试从环境变量加载账号配置")
+    else:
+        print("[配置] accounts.json文件不存在，从环境变量加载账号配置")
+
+    # 如果没有从文件加载到账号，则从环境变量ACCOUNTS_CONFIG加载
+    if not config["accounts"]:
+        accounts_json = os.getenv("ACCOUNTS_CONFIG", "[]")
+        try:
+            if accounts_json and accounts_json.strip():
+                # 处理环境变量中的引号问题
+                accounts_json = accounts_json.strip()
+                # 如果字符串被单引号包围，去掉单引号
+                if accounts_json.startswith("'") and accounts_json.endswith("'"):
+                    accounts_json = accounts_json[1:-1]
+                # 如果字符串被双引号包围，去掉双引号
+                elif accounts_json.startswith('"') and accounts_json.endswith('"'):
+                    accounts_json = accounts_json[1:-1]
+
+                config["accounts"] = json.loads(accounts_json)
+                print(f"[配置] 从ACCOUNTS_CONFIG加载了 {len(config['accounts'])} 个账号")
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"[!] ACCOUNTS_CONFIG JSON解析错误: {e}")
+            print(f"[!] 原始值: {accounts_json}")
 
     # 从JSON格式加载模型配置
     models_json = os.getenv("MODELS_CONFIG", "[]")
@@ -374,6 +447,8 @@ class AccountManager:
 
 # 全局账号管理器
 account_manager = AccountManager()
+# 自动加载配置
+account_manager.load_config()
 
 
 class FileManager:
@@ -515,27 +590,68 @@ def get_jwt_for_account(account: dict, proxy: str) -> str:
         "cookie": f'__Secure-C_SES={secure_c_ses}; __Host-C_OSES={host_c_oses}',
     }
 
-    resp = requests.get(url, headers=headers, proxies=proxies, verify=False, timeout=30)
+    print(f"[JWT] 开始获取JWT - csesidx: {csesidx}")
+    print(f"[JWT] 请求URL: {url}")
+    print(f"[JWT] 使用代理: {proxy if proxy else '无'}")
 
-    # 处理Google安全前缀
-    text = resp.text
-    if text.startswith(")]}'\n") or text.startswith(")]}'"):
-        text = text[4:].strip()
+    resp = None
+    try:
+        # 使用适度的超时时间
+        resp = requests.get(url, headers=headers, proxies=proxies, verify=False, timeout=10)
+        print(f"[JWT] 请求完成 - 状态码: {resp.status_code}")
 
-    data = json.loads(text)
-    if "keyId" not in data or "xsrfToken" not in data:
-        error_msg = f"账号 {csesidx} 认证失败，响应: {data}"
-        if "message" in data:
-            error_msg += f" - {data['message']}"
+        if resp.status_code != 200:
+            print(f"[JWT] 请求失败 - 响应内容: {resp.text[:200]}")
+            raise ValueError(f"JWT请求失败，状态码: {resp.status_code}")
+
+        # 处理Google安全前缀
+        text = resp.text
+        if text.startswith(")]}'\n") or text.startswith(")]}'"):
+            text = text[4:].strip()
+
+        data = json.loads(text)
+        if "keyId" not in data or "xsrfToken" not in data:
+            error_msg = f"账号 {csesidx} 认证失败，响应: {data}"
+            if "message" in data:
+                error_msg += f" - {data['message']}"
+            print(f"[JWT] 认证失败: {error_msg}")
+            raise ValueError(error_msg)
+
+        key_id = data["keyId"]
+        xsrf_token = data["xsrfToken"]
+
+        print(f"[JWT] JWT获取成功 - key_id: {key_id}")
+
+        key_bytes = decode_xsrf_token(xsrf_token)
+        return create_jwt(key_bytes, key_id, csesidx)
+
+    except requests.exceptions.Timeout:
+        print(f"[JWT] 请求超时 - 网络连接问题")
+        error_msg = "JWT认证超时 - 无法连接到Google服务器"
+        error_msg += "\n解决方案："
+        error_msg += "\n1. 检查网络连接和代理设置"
+        error_msg += "\n2. 确认防火墙允许访问Google服务"
+        error_msg += "\n3. 检查DNS设置是否正确"
+        error_msg += "\n4. 验证账号凭证是否有效"
         raise ValueError(error_msg)
-
-    key_id = data["keyId"]
-    print(f"账号: {account.get('csesidx')} 账号可用! key_id: {key_id}")
-    xsrf_token = data["xsrfToken"]
-
-    key_bytes = decode_xsrf_token(xsrf_token)
-
-    return create_jwt(key_bytes, key_id, csesidx)
+    except requests.exceptions.ConnectionError as e:
+        print(f"[JWT] 连接错误: {e}")
+        error_msg = f"JWT连接失败 - 无法访问Google服务器: {str(e)}"
+        error_msg += "\n请检查："
+        error_msg += "\n1. 网络连接是否正常"
+        error_msg += "\n2. 代理设置是否正确"
+        error_msg += "\n3. 账号凭证是否有效"
+        raise ValueError(error_msg)
+    except requests.exceptions.RequestException as e:
+        print(f"[JWT] 请求异常: {e}")
+        raise ValueError(f"JWT请求异常: {str(e)}")
+    except json.JSONDecodeError as e:
+        print(f"[JWT] JSON解析失败: {e}")
+        if resp:
+            print(f"[JWT] 响应内容: {resp.text[:200]}")
+        else:
+            print("[JWT] 无法获取响应内容")
+        raise ValueError(f"JWT响应解析失败: {str(e)}")
 
 
 def get_headers(jwt: str) -> dict:
@@ -619,11 +735,15 @@ def ensure_session_for_account(account_idx: int, account: dict, force_new_sessio
     print(f"[DEBUG][ensure_session_for_account] 开始 - 账号索引: {account_idx}, 强制新session: {force_new_session}")
     start_time = time.time()
 
+    print(f"[DEBUG][ensure_session_for_account] 尝试获取JWT...")
     jwt_start = time.time()
     jwt = ensure_jwt_for_account(account_idx, account)
     print(f"[DEBUG][ensure_session_for_account] JWT获取完成 - 耗时: {time.time() - jwt_start:.2f}秒")
 
+    print(f"[DEBUG][ensure_session_for_account] 尝试获取account_manager.lock...")
+    lock_start = time.time()
     with account_manager.lock:
+        print(f"[DEBUG][ensure_session_for_account] 获取到lock - 耗时: {time.time() - lock_start:.2f}秒")
         state = account_manager.account_states[account_idx]
         print(f"[DEBUG][ensure_session_for_account] 当前session状态: {state['session'] is not None}")
 
@@ -641,7 +761,7 @@ def ensure_session_for_account(account_idx: int, account: dict, force_new_sessio
         else:
             print(f"[DEBUG][ensure_session_for_account] 使用缓存session: {state['session']}")
 
-        print(f"[DEBUG][ensure_session_for_account] 完成 - 总耗时: {time.time() - start_time:.2f}秒")
+        print(f"[DEBUG][ensure_session_for_account] 释放lock - 总耗时: {time.time() - start_time:.2f}秒")
         return state["session"], jwt, account.get("team_id")
 
 
@@ -1215,10 +1335,14 @@ def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[s
     image_data = gen_img.get("image")
     if not image_data:
         return
-    
+
     # 检查base64数据
     b64_data = image_data.get("bytesBase64Encoded")
     if b64_data:
+        start_time = time.time()
+        success = False
+        image_id = None
+
         try:
             decoded = base64.b64decode(b64_data)
             mime_type = image_data.get("mimeType", "image/png")
@@ -1232,8 +1356,45 @@ def parse_generated_image(gen_img: Dict, result: ChatResponse, proxy: Optional[s
             )
             result.images.append(img)
             print(f"[图片] 已保存: {filename}")
+
+            success = True
+
+            # 获取数据库中的图片ID用于统计分析
+            if get_conversation_manager is not None and user_id is not None:
+                try:
+                    conversation_manager = get_conversation_manager()
+                    image_records = conversation_manager.get_images(user_id, page=1, per_page=1)
+                    if image_records and len(image_records) > 0:
+                        image_id = image_records[0].id
+                except Exception as db_e:
+                    print(f"[统计] 获取图片ID失败: {db_e}")
+
         except Exception as e:
             print(f"[图片] 解析base64失败: {e}")
+
+        # 记录生成统计数据
+        if analytics_manager is not None:
+            try:
+                generation_data = {
+                    'api_key': getattr(request, 'api_key', ''),  # 从请求中获取API key
+                    'team_id': getattr(request, 'team_id', ''),  # 从请求中获取team_id
+                    'email': getattr(request, 'email', ''),
+                    'model': getattr(request, 'model', 'gemini-enterprise'),
+                    'prompt': prompt or '',
+                    'success': success,
+                    'duration': int((time.time() - start_time) * 1000),  # 转换为毫秒
+                    'ip': request.remote_addr if request else '',
+                    'user_agent': request.headers.get('User-Agent', '') if request else '',
+                    'session_id': getattr(request, 'session_id', ''),
+                    'conversation_id': conversation_id,
+                    'user_id': user_id
+                }
+
+                if image_id is not None:
+                    analytics_manager.record_image_generation(image_id, generation_data)
+
+            except Exception as stat_e:
+                print(f"[统计] 记录生成统计失败: {stat_e}")
 
 
 def parse_image_from_content(content: Dict, result: ChatResponse, proxy: Optional[str] = None,
@@ -1293,7 +1454,52 @@ def parse_attachment(att: Dict, result: ChatResponse, proxy: Optional[str] = Non
 
 # ==================== OpenAPI 接口 ====================
 
+@app.route('/v1/status', methods=['GET'])
+@require_api_key
+def v1_system_status():
+    """系统状态 - OpenAI兼容格式"""
+    try:
+        # 获取配置信息
+        config = account_manager.config
+        if config is None:
+            config = load_config_from_env()
+
+        # 获取账号信息
+        all_accounts = config.get("accounts", [])
+        available_accounts = [acc for acc in all_accounts if acc.get('available', False)]
+
+        # 获取模型信息
+        models_config = config.get("models", [])
+        models = []
+        for model_config in models_config:
+            if model_config.get('enabled', True):
+                models.append({
+                    "id": model_config['id'],
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "business-gemini-pool"
+                })
+
+        # 获取代理状态
+        proxy_url = config.get("proxy", "")
+
+        return jsonify({
+            "object": "system_status",
+            "accounts_count": len(all_accounts),
+            "available_accounts": len(available_accounts),
+            "models_count": len(models),
+            "models": models,
+            "proxy_status": "enabled" if proxy_url else "disabled",
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        print(f"获取系统状态失败: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/v1/models', methods=['GET'])
+@require_api_key
 def list_models():
     """获取模型列表"""
     models_config = account_manager.config.get("models", [])
@@ -1635,26 +1841,60 @@ def chat_completions():
 
         # 构建响应内容（包含图片）
         response_content = build_openai_response_content(chat_response, request.host_url)
-        chat_logger.info(f"响应内容构建完成，响应长度: {len(response_content)} 字符")
+        chat_logger.info(f"响应内容构建完成，响应类型: {type(response_content)}")
 
         if stream:
             chat_logger.info("返回流式响应")
             # 流式响应
             def generate():
                 chunk_id = f"chatcmpl-{uuid.uuid4().hex[:8]}"
-                chunk = {
-                    "id": chunk_id,
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "gemini-enterprise",
-                    "choices": [{
-                        "index": 0,
-                        "delta": {"content": response_content},
-                        "finish_reason": None
-                    }]
-                }
+
+                # 如果是多模态内容，需要特殊处理流式响应
+                if isinstance(response_content, list):
+                    # 对于多模态内容，转换为适合流式传输的格式
+                    # OpenAI流式响应要求content是字符串，所以我们转换为混合格式
+                    text_content = ""
+                    image_urls = []
+
+                    for part in response_content:
+                        if part.get("type") == "text":
+                            text_content += part.get("text", "")
+                        elif part.get("type") == "image_url":
+                            image_urls.append(part.get("image_url", {}).get("url", ""))
+
+                    # 构建包含图片URL的文本内容
+                    if image_urls:
+                        text_content += "\n\n[Generated Images]\n"
+                        for img_url in image_urls:
+                            text_content += f"![Generated Image]({img_url})\n"
+
+                    chunk = {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": "gemini-enterprise",
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"content": text_content},
+                            "finish_reason": None
+                        }]
+                    }
+                else:
+                    # 纯文本内容
+                    chunk = {
+                        "id": chunk_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": "gemini-enterprise",
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"content": response_content},
+                            "finish_reason": None
+                        }]
+                    }
+
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-                
+
                 # 结束标记
                 end_chunk = {
                     "id": chunk_id,
@@ -1674,6 +1914,14 @@ def chat_completions():
         else:
             chat_logger.info("返回非流式响应")
             # 非流式响应
+            # 确保content字段格式正确
+            if isinstance(response_content, list):
+                # 多模态内容，直接使用数组格式
+                content = response_content
+            else:
+                # 纯文本内容，确保是字符串
+                content = str(response_content) if response_content else ""
+
             response = {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
                 "object": "chat.completion",
@@ -1683,7 +1931,7 @@ def chat_completions():
                     "index": 0,
                     "message": {
                         "role": "assistant",
-                        "content": response_content
+                        "content": content
                     },
                     "finish_reason": "stop"
                 }],
@@ -1696,6 +1944,42 @@ def chat_completions():
             end_time = time.time()
             request_duration = end_time - start_time
             chat_logger.info(f"聊天请求完成，总耗时: {request_duration:.2f}秒")
+
+            # 记录统计数据
+            chat_logger.info("开始记录统计数据...")
+            if analytics_manager is not None:
+                chat_logger.info("analytics_manager 不为空，开始记录...")
+                try:
+                    # 获取API key信息用于统计
+                    api_key = ''
+                    if 'Authorization' in request.headers:
+                        auth_header = request.headers['Authorization']
+                        if auth_header.startswith('Bearer '):
+                            api_key = auth_header[7:]  # 移除 'Bearer ' 前缀
+
+                    # 准备统计数据
+                    usage_data = {
+                        'api_key': api_key,
+                        'model': model,
+                        'success': True,
+                        'duration': request_duration,
+                        'tokens': 0,  # 可以从响应中提取token数量
+                        'images': 0,  # 可以从响应中提取图片数量
+                        'team_id': '',  # 可以从用户信息中获取
+                        'email': '',   # 可以从用户信息中获取
+                        'ip': client_ip,
+                        'user_agent': user_agent,
+                        'user_id': user_id,
+                        'conversation_id': active_conversation_id
+                    }
+
+                    # 调用analytics记录方法
+                    analytics_manager.record_chat_usage(usage_data)
+                    print(f"[统计] 聊天使用已记录: 模型={model}, 耗时={request_duration:.2f}s")
+
+                except Exception as stats_e:
+                    print(f"[统计] 记录聊天统计失败: {stats_e}")
+
             return jsonify(response)
 
     except Exception as e:
@@ -1706,6 +1990,37 @@ def chat_completions():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+def get_api_key_from_request():
+    """从请求中获取API密钥"""
+    provided_api_key = request.headers.get('Authorization', '').replace('Bearer ', '').replace('Api-Key ', '')
+    return provided_api_key
+
+def extract_keywords(text: str, max_keywords: int = 10) -> List[str]:
+    """从文本中提取关键词"""
+    if not text:
+        return []
+
+    import re
+    # 简单的关键词提取逻辑
+    # 移除标点符号，分割单词
+    words = re.findall(r'\b\w+\b', text.lower())
+
+    # 过滤停用词（简化版）
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been',
+                 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+                 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that',
+                 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they'}
+
+    # 过滤停用词和短词
+    keywords = [word for word in words if word not in stop_words and len(word) > 2]
+
+    # 统计词频并返回最常见的
+    from collections import Counter
+    keyword_counts = Counter(keywords)
+
+    return [word for word, _ in keyword_counts.most_common(max_keywords)]
 
 def get_image_base_url(fallback_host_url: str) -> str:
     """获取图片基础URL
@@ -1721,35 +2036,39 @@ def get_image_base_url(fallback_host_url: str) -> str:
     return fallback_host_url
 
 
-def build_openai_response_content(chat_response: ChatResponse, host_url: str) -> str:
+def build_openai_response_content(chat_response: ChatResponse, host_url: str):
     """构建OpenAI格式的响应内容
-    
-    返回纯文本，如果有图片则将图片URL追加到文本末尾
-    """
-    result_text = chat_response.text
-    
-    # 如果有图片，将图片URL追加到文本中
-    if chat_response.images:
-        base_url = get_image_base_url(host_url)
-        image_urls = []
-        
-        for img in chat_response.images:
-            if img.file_name:
-                image_url = f"{base_url}image/{img.file_name}"
-                image_urls.append(image_url)
-        
-        if image_urls:
-            # 在文本末尾添加图片URL，使用markdown格式
-            if result_text:
-                result_text += "\n\n"
 
-            # 将图片URL包装为markdown格式
-            for image_url in image_urls:
-                # 提取文件名作为图片描述
-                file_name = image_url.split('/')[-1]
-                result_text += f"![{file_name}]({image_url})\n"
-    
-    return result_text
+    返回结构化内容，如果有图片则使用OpenAI的多模态格式
+    """
+    # 如果没有图片，返回纯文本
+    if not chat_response.images:
+        return chat_response.text
+
+    # 构建多模态内容
+    content_parts = []
+
+    # 添加文本内容
+    if chat_response.text:
+        content_parts.append({
+            "type": "text",
+            "text": chat_response.text
+        })
+
+    # 添加图片内容
+    base_url = get_image_base_url(host_url)
+
+    for img in chat_response.images:
+        if img.file_name:
+            image_url = f"{base_url}image/{img.file_name}"
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": image_url
+                }
+            })
+
+    return content_parts
 
 
 # ==================== 图片服务接口 ====================
@@ -1795,8 +2114,8 @@ def health_check():
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
 
-@require_api_key
 @app.route('/v1/sessions/reset', methods=['POST'])
+@require_api_key
 def reset_sessions():
     """重置所有会话，���除对话记忆"""
     try:
@@ -1909,6 +2228,11 @@ def conversation_manager():
 def image_gallery():
     """返回图片相册页面"""
     return send_from_directory('.', 'image_gallery.html')
+
+@app.route('/test_analytics.html')
+def test_analytics():
+    """返回统计分析测试页面"""
+    return send_from_directory('.', 'test_analytics.html')
 
 @app.route('/api/accounts', methods=['GET'])
 @require_api_key
@@ -2049,6 +2373,161 @@ def test_account(account_id):
         return jsonify({"success": True, "message": "JWT获取成功"})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
+
+
+@app.route('/api/accounts/batch-import', methods=['POST'])
+@require_api_key
+def batch_import_accounts():
+    """批量导入账号"""
+    logger = logging.getLogger('gemini_pool.api')
+    try:
+        data = request.json
+        if not data or 'accounts' not in data:
+            return jsonify({"success": False, "error": "请提供账号数据"}), 400
+
+        accounts = data.get('accounts', [])
+        skip_duplicates = data.get('skip_duplicates', True)
+
+        if not isinstance(accounts, list) or len(accounts) == 0:
+            return jsonify({"success": False, "error": "账号数据必须是非空数组"}), 400
+
+        # 获取现有 Team ID 用于重复检查
+        existing_team_ids = set()
+        for acc in account_manager.accounts:
+            team_id = acc.get('team_id')
+            if team_id:
+                existing_team_ids.add(team_id)
+
+        imported_count = 0
+        skipped_count = 0
+        error_count = 0
+        errors = []
+
+        for i, account_data in enumerate(accounts):
+            try:
+                # 验证必需字段
+                team_id = account_data.get('team_id', '').strip()
+                if not team_id:
+                    errors.append(f"第 {i+1} 行: Team ID 不能为空")
+                    error_count += 1
+                    continue
+
+                # 检查重复
+                if skip_duplicates and team_id in existing_team_ids:
+                    skipped_count += 1
+                    continue
+
+                # 构建新账号对象
+                new_account = {
+                    "team_id": team_id,
+                    "secure_c_ses": account_data.get('secure_c_ses', ''),
+                    "host_c_oses": account_data.get('host_c_oses', ''),
+                    "csesidx": account_data.get('csesidx', ''),
+                    "user_agent": account_data.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'),
+                    "available": True
+                }
+
+                # 添加到账号列表
+                account_manager.accounts.append(new_account)
+                idx = len(account_manager.accounts) - 1
+                account_manager.account_states[idx] = {
+                    "jwt": None,
+                    "jwt_time": 0,
+                    "session": None,
+                    "available": True
+                }
+
+                existing_team_ids.add(team_id)
+                imported_count += 1
+
+            except Exception as e:
+                errors.append(f"第 {i+1} 行处理失败: {str(e)}")
+                error_count += 1
+
+        # 更新配置
+        account_manager.config["accounts"] = account_manager.accounts
+
+        logger.info(f"批量导入账号完成: 导入 {imported_count}, 跳过 {skipped_count}, 错误 {error_count}")
+
+        return jsonify({
+            "success": True,
+            "imported_count": imported_count,
+            "skipped_count": skipped_count,
+            "error_count": error_count,
+            "errors": errors
+        })
+
+    except Exception as e:
+        logger.error(f"批量导入账号失败: {str(e)}")
+        return jsonify({"success": False, "error": f"批量导入失败: {str(e)}"}), 500
+
+
+@app.route('/api/accounts/batch-delete', methods=['POST'])
+@require_api_key
+def batch_delete_accounts():
+    """批量删除账号"""
+    logger = logging.getLogger('gemini_pool.api')
+    try:
+        data = request.json
+        if not data or 'account_ids' not in data:
+            return jsonify({"success": False, "error": "请提供账号ID列表"}), 400
+
+        account_ids = data.get('account_ids', [])
+
+        if not isinstance(account_ids, list) or len(account_ids) == 0:
+            return jsonify({"success": False, "error": "账号ID列表必须是非空数组"}), 400
+
+        # 转换为集合并验证ID
+        ids_to_delete = set()
+        for acc_id in account_ids:
+            if isinstance(acc_id, int) and 0 <= acc_id < len(account_manager.accounts):
+                ids_to_delete.add(acc_id)
+
+        if not ids_to_delete:
+            return jsonify({"success": False, "error": "没有有效的账号ID"}), 400
+
+        deleted_count = 0
+        failed_count = 0
+        errors = []
+
+        # 按降序排列ID，避免删除时索引错乱
+        for account_id in sorted(ids_to_delete, reverse=True):
+            try:
+                if 0 <= account_id < len(account_manager.accounts):
+                    account_manager.accounts.pop(account_id)
+                    deleted_count += 1
+                else:
+                    failed_count += 1
+                    errors.append(f"账号ID {account_id} 不存在")
+            except Exception as e:
+                failed_count += 1
+                errors.append(f"删除账号ID {account_id} 失败: {str(e)}")
+
+        # 重建状态映射 - 重新为剩余账号分配状态
+        new_states = {}
+        old_states_dict = {old_idx: state for old_idx, state in account_manager.account_states.items()
+                          if old_idx not in ids_to_delete}
+
+        # 按照旧索引的顺序重新映射
+        sorted_old_indices = sorted(old_states_dict.keys())
+        for new_idx, old_idx in enumerate(sorted_old_indices):
+            new_states[new_idx] = old_states_dict[old_idx]
+
+        account_manager.account_states = new_states
+        account_manager.config["accounts"] = account_manager.accounts
+
+        logger.info(f"批量删除账号完成: 删除 {deleted_count}, 失败 {failed_count}")
+
+        return jsonify({
+            "success": True,
+            "deleted_count": deleted_count,
+            "failed_count": failed_count,
+            "errors": errors
+        })
+
+    except Exception as e:
+        logger.error(f"批量删除账号失败: {str(e)}")
+        return jsonify({"success": False, "error": f"批量删除失败: {str(e)}"}), 500
 
 
 @require_api_key
@@ -3088,6 +3567,139 @@ def print_startup_info():
 
     print("\n" + "="*60)
     print("启动服务...")
+
+
+# ========================================
+# 兼容性路由 - 解决前端路径不匹配问题
+# ========================================
+
+@app.route('/api/analytics/overview', methods=['GET'])
+@require_api_key
+def analytics_overview_compatibility():
+    """统计分析概览接口 - 兼容性路由，重定向到实际实现"""
+    try:
+        # 重定向到实际的统计分析接口
+        from flask import redirect, url_for
+
+        # 获取查询参数
+        days = request.args.get('days', 30, type=int)
+        days = min(max(days, 1), 365)  # 限制在1-365天之间
+
+        # 临时返回硬编码测试数据以验证前端
+        print(f"[兼容性路由] 收到统计分析请求，days={days}")
+        test_data = {
+            'time_range_days': days,
+            'overall': {
+                'total_generations': 25,
+                'successful_generations': 23,
+                'success_rate': 92.0,
+                'active_api_keys': 1,
+                'unique_sessions': 3,
+                'unique_users': 2,
+                'avg_generation_duration_ms': 1500,
+                'active_days': 5,
+                'total_tokens': 5120,
+                'total_images': 8,
+                'active_models': 2
+            },
+            'top_models': [
+                {'model': 'gemini-enterprise2', 'count': 20, 'successful': 19, 'success_rate': 95.0},
+                {'model': 'gemini-1.5-flash', 'count': 5, 'successful': 4, 'success_rate': 80.0}
+            ],
+            'top_keywords': [
+                {'keyword': '编程', 'count': 15},
+                {'keyword': '设计', 'count': 10}
+            ],
+            'generated_at': '2025-12-01T03:30:00.000000'
+        }
+        # 如果analytics_manager可用，直接调用真实数据
+        print(f"[DEBUG] analytics_manager状态: {analytics_manager is not None}")
+        if analytics_manager is not None:
+            print(f"[DEBUG] 开始调用analytics_manager.get_overview_stats(days={days})")
+            stats = analytics_manager.get_overview_stats(days)
+            print(f"[DEBUG] analytics_manager返回结果: {stats}")
+            return jsonify(stats)
+        else:
+            return jsonify({
+                'error': '统计分析功能未启用',
+                'message': '请检查analytics_apis模块是否正确加载'
+            }), 503
+
+    except Exception as e:
+        return jsonify({
+            'error': f'获取分析概览失败: {str(e)}',
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+# 其他统计分析兼容性路由
+@app.route('/api/analytics/usage', methods=['GET'])
+@require_api_key
+def analytics_usage_compatibility():
+    """使用统计接口 - 兼容性路由"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        days = min(max(days, 1), 365)
+
+        if analytics_manager is not None:
+            stats = analytics_manager.get_usage_stats(days)
+            return jsonify(stats)
+        else:
+            return jsonify({
+                'error': '统计分析功能未启用',
+                'message': '请检查analytics_apis模块是否正确加载'
+            }), 503
+
+    except Exception as e:
+        return jsonify({
+            'error': f'获取使用统计失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/analytics/conversations', methods=['GET'])
+@require_api_key
+def analytics_conversations_compatibility():
+    """对话统计接口 - 兼容性路由"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        days = min(max(days, 1), 365)
+
+        if analytics_manager is not None:
+            stats = analytics_manager.get_conversation_stats(days)
+            return jsonify(stats)
+        else:
+            return jsonify({
+                'error': '统计分析功能未启用',
+                'message': '请检查analytics_apis模块是否正确加载'
+            }), 503
+
+    except Exception as e:
+        return jsonify({
+            'error': f'获取对话统计失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/analytics/images', methods=['GET'])
+@require_api_key
+def analytics_images_compatibility():
+    """图片统计接口 - 兼容性路由"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        days = min(max(days, 1), 365)
+
+        if analytics_manager is not None:
+            stats = analytics_manager.get_image_stats(days)
+            return jsonify(stats)
+        else:
+            return jsonify({
+                'error': '统计分析功能未启用',
+                'message': '请检查analytics_apis模块是否正确加载'
+            }), 503
+
+    except Exception as e:
+        return jsonify({
+            'error': f'获取图片统计失败: {str(e)}'
+        }), 500
 
 
 if __name__ == '__main__':

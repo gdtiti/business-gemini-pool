@@ -102,7 +102,6 @@ tmp/
 *.tmp
 
 # Development and test scripts (keep production files)
-test_*.py
 debug_*.py
 *_test*.py
 fix_*.py
@@ -112,6 +111,9 @@ quick_*.py
 simple_*.py
 update_*.py
 final_*.py
+
+# Keep certain test files that are needed for production
+!test_api_key_manager.py
 
 # Development HTML files
 test_*.html

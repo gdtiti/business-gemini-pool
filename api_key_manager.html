@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API密钥管理 - Business Gemini Pool</title>
+    <style>
+        /* 基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 头部样式 */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: #333;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h3 {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .form-group textarea,
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9em;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+
+        .form-group textarea:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+        }
+
+        .btn-success:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        /* 表格样式 */
+        .table-container {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .checkbox-cell {
+            width: 50px;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            animation: modalSlideIn 0.3s ease;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            color: #333;
+            margin: 0;
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        /* 加载动画 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 错误和成功消息 */
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        /* 徽章样式 */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .modal-content {
+                margin: 5% auto;
+                width: 95%;
+                padding: 20px;
+            }
+
+            .table-container {
+                padding: 15px;
+            }
+
+            th, td {
+                padding: 8px;
+                font-size: 0.9em;
+            }
+        }
+
+        /* 操作按钮组 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        /* 统计信息 */
+        .stats-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🔑 API密钥管理中心</h1>
+            <p>批量管理、导入和统计分析API密钥</p>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <a href="index.html" class="nav-btn">
+                <span>🏠</span>
+                <span>主页</span>
+            </a>
+            <a href="conversation_manager.html" class="nav-btn">
+                <span>💬</span>
+                <span>会话管理</span>
+            </a>
+            <a href="image_gallery.html" class="nav-btn">
+                <span>🖼️</span>
+                <span>图片相册</span>
+            </a>
+            <a href="analytics.html" class="nav-btn">
+                <span>📊</span>
+                <span>统计分析</span>
+            </a>
+            <a href="api_key_manager.html" class="nav-btn active">
+                <span>🔑</span>
+                <span>密钥管理</span>
+            </a>
+        </div>
+
+        <!-- 消息显示区域 -->
+        <div id="messageArea"></div>
+
+        <!-- 主要内容 -->
+        <div class="main-content">
+            <!-- 批量导入 -->
+            <div class="card">
+                <h3>📥 批量导入API密钥</h3>
+                <div class="form-group">
+                    <label for="importData">JSON格式的账号数据</label>
+                    <textarea id="importData" placeholder='[
+  {
+    "team_id": "your_team_id_1",
+    "email": "email1@example.com",
+    "user_agent": "Mozilla/5.0..."
+  },
+  {
+    "team_id": "your_team_id_2",
+    "email": "email2@example.com"
+  }
+]'></textarea>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="importApiKeys()">
+                        <span>📥</span>
+                        <span>批量导入</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadExample()">
+                        <span>📝</span>
+                        <span>加载示例</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 危险操作 -->
+            <div class="card">
+                <h3>⚠️ 危险操作</h3>
+                <div class="stats-info">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalKeys">-</div>
+                        <div class="stat-label">总API密钥数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="activeKeys">-</div>
+                        <div class="stat-label">活跃密钥数</div>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="exportApiKeys()">
+                        <span>📤</span>
+                        <span>导出数据</span>
+                    </button>
+                    <button class="btn btn-danger" onclick="showBatchDeleteModal()">
+                        <span>🗑️</span>
+                        <span>批量删除</span>
+                    </button>
+                    <button class="btn btn-danger" onclick="showClearAllModal()">
+                        <span>💣</span>
+                        <span>清空所有</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API密钥列表 -->
+        <div class="table-container">
+            <h3>📋 API密钥列表</h3>
+            <div class="btn-group" style="margin-bottom: 20px;">
+                <button class="btn btn-primary" onclick="selectAll()">全选</button>
+                <button class="btn btn-secondary" onclick="deselectAll()">取消全选</button>
+                <button class="btn btn-danger" onclick="deleteSelected()" id="deleteSelectedBtn" style="display: none;">
+                    <span>🗑️</span>
+                    <span>删除选中</span>
+                </button>
+            </div>
+            <div id="apiKeysTable">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>正在加载API密钥数据...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量删除确认模态框 -->
+    <div id="batchDeleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>确认批量删除</h3>
+                <span class="close" onclick="closeBatchDeleteModal()">&times;</span>
+            </div>
+            <p>您确定要删除选中的 <span id="deleteCount">0</span> 个API密钥吗？</p>
+            <p><strong>此操作不可撤销！</strong></p>
+            <div class="btn-group">
+                <button class="btn btn-danger" onclick="confirmBatchDelete()">确认删除</button>
+                <button class="btn btn-secondary" onclick="closeBatchDeleteModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 清空所有确认模态框 -->
+    <div id="clearAllModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚠️ 确认清空所有数据</h3>
+                <span class="close" onclick="closeClearAllModal()">&times;</span>
+            </div>
+            <p><strong>警告：此操作将删除所有API密钥统计数据，且无法恢复！</strong></p>
+            <p>请在下方输入 <code>CLEAR_ALL_API_KEYS_CONFIRMED</code> 以确认此操作：</p>
+            <div class="form-group">
+                <input type="text" id="confirmationText" placeholder="输入确认文本">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-danger" onclick="confirmClearAll()">确认清空</button>
+                <button class="btn btn-secondary" onclick="closeClearAllModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/v1';
+        let selectedKeys = new Set();
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadApiKeys();
+            loadStats();
+        });
+
+        // 获取API请求头
+        function getApiHeaders() {
+            const apiKey = localStorage.getItem('gemini_api_key') || '';
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (apiKey) {
+                headers['Authorization'] = `Bearer ${apiKey}`;
+            }
+            return headers;
+        }
+
+        // 显示消息
+        function showMessage(message, type = 'info') {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `<div class="message ${type}">${message}</div>`;
+
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                messageArea.innerHTML = '';
+            }, 5000);
+        }
+
+        // 加载API密钥列表
+        async function loadApiKeys() {
+            try {
+                const response = await fetch(`${API_BASE}/analytics/api-keys`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取API密钥列表失败');
+
+                const data = await response.json();
+                renderApiKeysTable(data.api_keys);
+                updateSelectionButtons();
+
+            } catch (error) {
+                console.error('加载API密钥失败:', error);
+                document.getElementById('apiKeysTable').innerHTML = `
+                    <div class="message error">加载API密钥列表失败: ${error.message}</div>
+                `;
+            }
+        }
+
+        // 加载统计信息
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/analytics/api-keys?limit=1000`, {
+                    headers: getApiHeaders()
+                });
+
+                if (!response.ok) throw new Error('获取统计信息失败');
+
+                const data = await response.json();
+                const totalKeys = data.api_keys.length;
+                const activeKeys = data.api_keys.filter(key => key.is_active).length;
+
+                document.getElementById('totalKeys').textContent = totalKeys;
+                document.getElementById('activeKeys').textContent = activeKeys;
+
+            } catch (error) {
+                console.error('加载统计信息失败:', error);
+                document.getElementById('totalKeys').textContent = '0';
+                document.getElementById('activeKeys').textContent = '0';
+            }
+        }
+
+        // 渲染API密钥表格
+        function renderApiKeysTable(apiKeys) {
+            const container = document.getElementById('apiKeysTable');
+
+            if (!apiKeys || apiKeys.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <div style="font-size: 3em; margin-bottom: 20px; opacity: 0.3;">🔑</div>
+                        <div>暂无API密钥数据</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                            </th>
+                            <th>API密钥</th>
+                            <th>Team ID</th>
+                            <th>邮箱</th>
+                            <th>总请求</th>
+                            <th>成功请求</th>
+                            <th>成功率</th>
+                            <th>生成图片</th>
+                            <th>最后使用</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            apiKeys.forEach(key => {
+                const successRate = key.success_rate_percent || 0;
+                const lastUsed = key.last_used_at ? new Date(key.last_used_at).toLocaleString('zh-CN') : '从未使用';
+                const maskedKey = key.api_key_masked || '未知';
+                const isActive = key.is_active;
+
+                tableHTML += `
+                    <tr>
+                        <td class="checkbox-cell">
+                            <input type="checkbox" value="${key.api_key_hash}" onchange="toggleKeySelection('${key.api_key_hash}')">
+                        </td>
+                        <td><code>${maskedKey}</code></td>
+                        <td>${key.account_team_id || '未知'}</td>
+                        <td>${key.account_email || '-'}</td>
+                        <td>${key.total_requests}</td>
+                        <td>${key.successful_requests}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="progress-bar" style="flex: 1; min-width: 60px;">
+                                    <div class="progress-fill" style="width: ${successRate}%"></div>
+                                </div>
+                                <span>${successRate}%</span>
+                            </div>
+                        </td>
+                        <td>${key.total_images_generated}</td>
+                        <td>${lastUsed}</td>
+                        <td>
+                            ${isActive ? '<span class="badge badge-success">活跃</span>' : '<span class="badge badge-warning">非活跃</span>'}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-danger" onclick="deleteSingleKey('${key.api_key_hash}')">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += '</tbody></table>';
+            container.innerHTML = tableHTML;
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const checkboxes = document.querySelectorAll('#apiKeysTable input[type="checkbox"]');
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+                if (checkbox.value) {
+                    if (selectAllCheckbox.checked) {
+                        selectedKeys.add(checkbox.value);
+                    } else {
+                        selectedKeys.delete(checkbox.value);
+                    }
+                }
+            });
+
+            updateSelectionButtons();
+        }
+
+        function selectAll() {
+            document.getElementById('selectAllCheckbox').checked = true;
+            toggleSelectAll();
+        }
+
+        function deselectAll() {
+            document.getElementById('selectAllCheckbox').checked = false;
+            toggleSelectAll();
+        }
+
+        // 切换单个选择
+        function toggleKeySelection(keyHash) {
+            if (selectedKeys.has(keyHash)) {
+                selectedKeys.delete(keyHash);
+            } else {
+                selectedKeys.add(keyHash);
+            }
+            updateSelectionButtons();
+        }
+
+        // 更新选择按钮状态
+        function updateSelectionButtons() {
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            if (selectedKeys.size > 0) {
+                deleteBtn.style.display = 'inline-flex';
+            } else {
+                deleteBtn.style.display = 'none';
+            }
+        }
+
+        // 批量导入API密钥
+        async function importApiKeys() {
+            const textarea = document.getElementById('importData');
+            const data = textarea.value.trim();
+
+            if (!data) {
+                showMessage('请输入要导入的JSON数据', 'error');
+                return;
+            }
+
+            try {
+                const accounts = JSON.parse(data);
+
+                if (!Array.isArray(accounts)) {
+                    showMessage('数据必须是JSON数组格式', 'error');
+                    return;
+                }
+
+                showMessage('正在导入API密钥...', 'warning');
+
+                const response = await fetch(`${API_BASE}/api-keys/batch-import`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({ accounts: accounts })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '导入失败');
+                }
+
+                showMessage(`导入成功！导入 ${result.imported_count} 个，跳过 ${result.skipped_count} 个，错误 ${result.error_count} 个`, 'success');
+
+                // 显示详细信息
+                if (result.details && result.details.length > 0) {
+                    console.log('导入详情:', result.details);
+                }
+
+                // 清空输入框并重新加载数据
+                textarea.value = '';
+                loadApiKeys();
+                loadStats();
+
+            } catch (error) {
+                console.error('导入失败:', error);
+                showMessage(`导入失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 加载示例数据
+        function loadExample() {
+            const exampleData = [
+                {
+                    "team_id": "example_team_id_001",
+                    "email": "user1@example.com",
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                },
+                {
+                    "team_id": "example_team_id_002",
+                    "email": "user2@example.com",
+                    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                },
+                {
+                    "team_id": "example_team_id_003",
+                    "email": "user3@example.com"
+                }
+            ];
+
+            document.getElementById('importData').value = JSON.stringify(exampleData, null, 2);
+            showMessage('已加载示例数据，请根据实际情况修改', 'success');
+        }
+
+        // 导出API密钥
+        async function exportApiKeys() {
+            try {
+                showMessage('正在导出API密钥数据...', 'warning');
+
+                const response = await fetch(`${API_BASE}/api-keys/export`, {
+                    headers: getApiHeaders()
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '导出失败');
+                }
+
+                // 创建下载链接
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `api_keys_export_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showMessage(`成功导出 ${data.total_count} 个API密钥`, 'success');
+
+            } catch (error) {
+                console.error('导出失败:', error);
+                showMessage(`导出失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 显示批量删除模态框
+        function showBatchDeleteModal() {
+            if (selectedKeys.size === 0) {
+                showMessage('请先选择要删除的API密钥', 'warning');
+                return;
+            }
+
+            document.getElementById('deleteCount').textContent = selectedKeys.size;
+            document.getElementById('batchDeleteModal').style.display = 'block';
+        }
+
+        // 关闭批量删除模态框
+        function closeBatchDeleteModal() {
+            document.getElementById('batchDeleteModal').style.display = 'none';
+        }
+
+        // 确认批量删除
+        async function confirmBatchDelete() {
+            try {
+                showMessage('正在删除选中的API密钥...', 'warning');
+
+                const response = await fetch(`${API_BASE}/api-keys/batch-delete`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({
+                        api_key_hashes: Array.from(selectedKeys)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '删除失败');
+                }
+
+                showMessage(result.message, 'success');
+                closeBatchDeleteModal();
+
+                // 清空选择并重新加载数据
+                selectedKeys.clear();
+                loadApiKeys();
+                loadStats();
+
+            } catch (error) {
+                console.error('批量删除失败:', error);
+                showMessage(`批量删除失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 显示清空所有模态框
+        function showClearAllModal() {
+            document.getElementById('clearAllModal').style.display = 'block';
+        }
+
+        // 关闭清空所有模态框
+        function closeClearAllModal() {
+            document.getElementById('clearAllModal').style.display = 'none';
+            document.getElementById('confirmationText').value = '';
+        }
+
+        // 确认清空所有
+        async function confirmClearAll() {
+            const confirmationText = document.getElementById('confirmationText').value.trim();
+
+            if (confirmationText !== 'CLEAR_ALL_API_KEYS_CONFIRMED') {
+                showMessage('确认文本不正确，操作已取消', 'error');
+                return;
+            }
+
+            try {
+                showMessage('正在清空所有API密钥数据...', 'warning');
+
+                const response = await fetch(`${API_BASE}/api-keys/clear-all`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({
+                        confirmation: confirmationText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '清空失败');
+                }
+
+                showMessage(result.message, 'success');
+                closeClearAllModal();
+
+                // 清空选择并重新加载数据
+                selectedKeys.clear();
+                loadApiKeys();
+                loadStats();
+
+            } catch (error) {
+                console.error('清空失败:', error);
+                showMessage(`清空失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 删除单个API密钥
+        async function deleteSingleKey(keyHash) {
+            if (!confirm('确定要删除这个API密钥吗？此操作不可撤销。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api-keys/batch-delete`, {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({
+                        api_key_hashes: [keyHash]
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '删除失败');
+                }
+
+                showMessage(result.message, 'success');
+
+                // 重新加载数据
+                loadApiKeys();
+                loadStats();
+
+            } catch (error) {
+                console.error('删除失败:', error);
+                showMessage(`删除失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 删除选中的API密钥
+        function deleteSelected() {
+            showBatchDeleteModal();
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const batchModal = document.getElementById('batchDeleteModal');
+            const clearModal = document.getElementById('clearAllModal');
+
+            if (event.target === batchModal) {
+                closeBatchDeleteModal();
+            }
+            if (event.target === clearModal) {
+                closeClearAllModal();
+            }
+        }
+    </script>
+</body>
+</html>
